@@ -17,15 +17,22 @@ static volatile int s_fd = -1;
 static volatile bool s_secure;   // current client arrived over TLS (wss)
 static TaskHandle_t s_tx_task;
 
+// Stable non-NULL marker for the TLS server's user_ctx (a real pointer, so no
+// int-to-pointer cast); its address just has to be distinct from NULL.
+static char s_secure_marker;
+
 bool ws_serial_is_secure(void)
 {
-    return s_secure;
+    // Only meaningful while a WS client owns the bridge; gate on ownership so a
+    // stale flag from a closed wss session can't read back as secure.
+    return bridge_client_owner() == BRIDGE_CLIENT_WS && s_secure;
 }
 
 static void ws_drop(void)
 {
     s_fd = -1;
     s_hd = NULL;
+    s_secure = false;
     bridge_release(BRIDGE_CLIENT_WS);
     bridge_reset();
 }
@@ -80,7 +87,12 @@ static esp_err_t ws_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // A frame from the Configurator. First call with len 0 gets the length.
+    // A frame from the Configurator. Frames may arrive from a superseded session
+    // (one we replaced via newest-wins but that hasn't finished closing) — those
+    // must not touch the promoted client's bridge, so gate on the active session.
+    bool active = (req->handle == s_hd && httpd_req_to_sockfd(req) == s_fd);
+
+    // First call with len 0 gets the length.
     httpd_ws_frame_t frame;
     memset(&frame, 0, sizeof(frame));
     frame.type = HTTPD_WS_TYPE_BINARY;
@@ -89,8 +101,10 @@ static esp_err_t ws_handler(httpd_req_t *req)
         return ret;
     }
     if (frame.type == HTTPD_WS_TYPE_CLOSE) {
-        ESP_LOGI(TAG, "client closed");
-        ws_drop();
+        if (active) {
+            ESP_LOGI(TAG, "client closed");
+            ws_drop();
+        }
         return ESP_OK;
     }
     if (frame.len) {
@@ -100,7 +114,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
         }
         frame.payload = payload;
         ret = httpd_ws_recv_frame(req, &frame, frame.len);
-        if (ret == ESP_OK &&
+        if (ret == ESP_OK && active &&
             (frame.type == HTTPD_WS_TYPE_BINARY || frame.type == HTTPD_WS_TYPE_TEXT)) {
             bridge_net_to_usb_push(payload, frame.len);
         }
@@ -119,7 +133,7 @@ void ws_serial_register(httpd_handle_t server, bool secure)
         .is_websocket = true,
         .handle_ws_control_frames = true,   // deliver CLOSE so we release the claim
         .supported_subprotocol = "wsSerial",
-        .user_ctx = secure ? (void *)1 : NULL,
+        .user_ctx = secure ? &s_secure_marker : NULL,
     };
     httpd_register_uri_handler(server, &uri);
 
