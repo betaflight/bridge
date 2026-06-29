@@ -6,6 +6,7 @@
 #include "ws_serial.h"
 #include "tls_cert.h"
 #include "bridge.h"
+#include "version.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -23,11 +24,6 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
 
 #define MAX_SCAN_APS  20
 
-// Shown in the web UI tagline. The release workflow stamps the tag in via
-// -DBRIDGE_VERSION=<tag>; this is the default for local/dev builds.
-#ifndef BRIDGE_VERSION
-#define BRIDGE_VERSION  "2026.6.0-alpha"
-#endif
 
 // Single-page UI. Status fields and the network list are filled by JS polling
 // /status and /scan, so the page itself is static and cacheable.

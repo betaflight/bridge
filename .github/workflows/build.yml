@@ -79,10 +79,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: betaflight-bridge-${{ matrix.board }}
-          path: dist/betaflight-bridge-${{ matrix.board }}.bin
+          path: dist/betaflight-bridge-${{ matrix.board }}*.bin
 
       - name: Attach to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/betaflight-bridge-${{ matrix.board }}.bin
+          files: dist/betaflight-bridge-${{ matrix.board }}*.bin
