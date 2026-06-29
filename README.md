@@ -26,10 +26,12 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 | `src/main/main.c` | Startup: NVS, bridge, WiFi, TCP server, USB host |
 | `src/main/usb_cdc_host.c` | USB host + CDC-ACM; opens the FC VCP, pumps bytes |
 | `src/main/tcp_server.c` | TCP listener on 5761; one Configurator client at a time |
+| `src/main/ws_serial.c` | WebSocket serial endpoint (`/serial`) for browser clients — ws:// and wss:// |
+| `src/main/tls_cert.c` | Self-signed TLS cert generated on first boot, persisted in NVS |
 | `src/main/wifi.c` | Station-first WiFi: joins a stored network, SoftAP fallback, creds in NVS |
-| `src/main/http_status.c` | Web UI on port 80: status + scan/join a network + firmware upload |
+| `src/main/http_status.c` | Web UI on 80 (HTTP) and 443 (HTTPS): status + scan/join + firmware upload + `/serial` |
 | `src/main/ota.c` | `POST /update` OTA handler; streams an uploaded .bin into the spare slot |
-| `src/main/bridge.c` | Two stream buffers decoupling the USB and TCP contexts |
+| `src/main/bridge.c` | Two stream buffers decoupling USB and network; single-client arbiter (TCP vs WS) |
 | `boards/<board>/` | Per-board flash size, partition table, PSRAM and identity |
 | `esp-idf/` | Pinned ESP-IDF (git submodule, `release/v5.4`, shallow) |
 
@@ -172,6 +174,29 @@ router assigns (shown on the page). If that network is ever unreachable at boot,
 the SoftAP comes back up automatically so you can reconfigure. Use *Forget* on
 the page to clear the stored network and return to AP-only setup mode.
 
+### Connecting from a browser (WebSocket / WSS)
+
+The desktop (Tauri) and Android (Capacitor) apps connect over the raw **TCP**
+transport above. A **browser** can't open a raw TCP socket, so the bridge also
+exposes the serial stream as a WebSocket at `/serial`:
+
+- `ws://<ip>/serial` (port 80) — usable when the app page is served over plain
+  HTTP (e.g. a local dev build).
+- `wss://<ip>/serial` (port 443) — required by the hosted app at
+  `app.betaflight.com` (an HTTPS page may only open a *secure* WebSocket).
+
+In Configurator, enable expert mode, pick the manual connection option, and
+enter the URL (the status page shows the exact `wss://<ip>/serial` to use).
+
+**Certificate acceptance (one-time).** The TLS server uses a **self-signed**
+certificate generated on the device's first boot and stored in NVS, so it is
+stable across reboots and OTA updates. Because it isn't from a public CA, a
+browser will refuse the `wss://` connection until the certificate is trusted:
+**visit `https://<ip>/` once and click through the warning** ("Proceed to …").
+The browser then remembers the exception and `wss://<ip>/serial` connects from
+then on — including from `app.betaflight.com`. You only need to do this again if
+the bridge's IP changes or the certificate is cleared (e.g. an NVS erase).
+
 ## Updating (OTA)
 
 After the first serial flash, firmware is updated over WiFi — no cable. On the
@@ -197,7 +222,9 @@ on the status page.
 
 - Known FC VCP USB IDs (ST / Artery / Geehy) are listed in `usb_cdc_host.c`;
   add new vendors there.
-- Single client at a time — Configurator opens one connection.
+- Single client at a time — one Configurator connection, shared across the TCP
+  and WebSocket transports (a new browser connection supersedes a stale one; a
+  raw-TCP client in progress is left alone).
 - `TCP_NODELAY` is set and Nagle effectively disabled to keep MSP latency low.
 
 ## Licence
