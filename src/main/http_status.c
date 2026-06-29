@@ -3,15 +3,22 @@
 #include "tcp_server.h"
 #include "wifi.h"
 #include "ota.h"
+#include "ws_serial.h"
+#include "tls_cert.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 
 #include "esp_http_server.h"
+#include "esp_https_server.h"
 #include "esp_log.h"
 
 static const char *TAG = "http";
+
+// Favicon (the Betaflight mark), embedded via EMBED_TXTFILES in CMakeLists.
+extern const char icon_svg_start[] asm("_binary_icon_svg_start");
+extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
 
 #define MAX_SCAN_APS  20
 
@@ -25,6 +32,7 @@ static const char PAGE[] =
     "<meta charset=\"utf-8\">"
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
     "<title>betaflight-bridge</title>"
+    "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/icon.svg\">"
     "<style>"
     "*{box-sizing:border-box}"
     "body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:#0f1115;color:#e6e8ea;margin:0;padding:1.7rem 1rem;-webkit-font-smoothing:antialiased}"
@@ -61,6 +69,7 @@ static const char PAGE[] =
     "<tr><td class=\"k\">WiFi network</td><td id=\"sta\">…</td></tr>"
     "<tr><td class=\"k\">Signal</td><td id=\"rssi\">…</td></tr>"
     "<tr><td class=\"k\">IP address</td><td id=\"ip\">…</td></tr>"
+    "<tr><td class=\"k\">Browser connect</td><td id=\"url\">…</td></tr>"
     "<tr><td class=\"k\">Gateway</td><td id=\"gw\">…</td></tr>"
     "<tr><td class=\"k\">Netmask</td><td id=\"mask\">…</td></tr>"
     "<tr><td class=\"k\">Access point</td><td id=\"ap\">…</td></tr>"
@@ -102,6 +111,7 @@ static const char PAGE[] =
     "$('rssi').innerHTML='<code>'+bars(rs)+'</code> '+q+' <code>'+rs+' dBm</code>';"
     "}else $('rssi').innerHTML='<span class=\\\"down\\\">—</span>';"
     "$('ip').innerHTML=w.ip?'<code>'+w.ip+'</code>':'<span class=\\\"down\\\">—</span>';"
+    "$('url').innerHTML=w.ip?'<code>wss://'+w.ip+'/serial</code>':'<span class=\\\"down\\\">—</span>';"
     "$('gw').innerHTML=w.gw?'<code>'+w.gw+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('mask').innerHTML=w.netmask?'<code>'+w.netmask+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('ap').innerHTML=w.ap?'<span class=\\\"warn\\\">broadcasting (setup mode)</span>':'<span class=\\\"down\\\">off</span>';"
@@ -175,6 +185,14 @@ static esp_err_t root_get(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, PAGE, sizeof(PAGE) - 1);
+}
+
+static esp_err_t icon_get(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "image/svg+xml");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=86400");
+    // EMBED_TXTFILES appends a NUL terminator; don't send it.
+    return httpd_resp_send(req, icon_svg_start, icon_svg_end - icon_svg_start - 1);
 }
 
 static esp_err_t status_get(httpd_req_t *req)
@@ -258,28 +276,75 @@ static esp_err_t wifi_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
-void http_status_start(void)
+// Attach the web UI + serial endpoints to a server (used for both the plain
+// HTTP and the TLS server, so the page and the ws/wss serial bridge are
+// reachable on either).
+static void register_routes(httpd_handle_t server)
+{
+    const httpd_uri_t routes[] = {
+        { .uri = "/",         .method = HTTP_GET,  .handler = root_get   },
+        { .uri = "/icon.svg", .method = HTTP_GET,  .handler = icon_get   },
+        { .uri = "/status",   .method = HTTP_GET,  .handler = status_get },
+        { .uri = "/scan",     .method = HTTP_GET,  .handler = scan_get   },
+        { .uri = "/wifi",     .method = HTTP_POST, .handler = wifi_post  },
+    };
+    for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
+        httpd_register_uri_handler(server, &routes[i]);
+    }
+    ota_register(server);       // POST /update
+    ws_serial_register(server); // GET /serial (WebSocket)
+}
+
+// Start the plain HTTP server on port 80 (web UI + ws:// serial).
+static void start_http(void)
 {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port = 80;
     cfg.lru_purge_enable = true;   // free idle sockets so the page stays reachable
     cfg.stack_size = 8192;         // headroom for the blocking scan + JSON
+    cfg.max_uri_handlers = 12;     // routes + /update + /serial
 
     httpd_handle_t server = NULL;
     if (httpd_start(&server, &cfg) != ESP_OK) {
         ESP_LOGE(TAG, "failed to start HTTP server");
         return;
     }
-
-    const httpd_uri_t routes[] = {
-        { .uri = "/",       .method = HTTP_GET,  .handler = root_get   },
-        { .uri = "/status", .method = HTTP_GET,  .handler = status_get },
-        { .uri = "/scan",   .method = HTTP_GET,  .handler = scan_get   },
-        { .uri = "/wifi",   .method = HTTP_POST, .handler = wifi_post  },
-    };
-    for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
-        httpd_register_uri_handler(server, &routes[i]);
-    }
-    ota_register(server);   // POST /update
+    register_routes(server);
     ESP_LOGI(TAG, "web UI on http://%s/ (port 80)", WIFI_AP_IP);
+}
+
+// Start the TLS server on 443 (web UI + wss:// serial) so the HTTPS Configurator
+// PWA can connect. Self-signed cert from tls_cert (generated once, kept in NVS).
+static void start_https(void)
+{
+    const unsigned char *cert, *key;
+    size_t cert_len, key_len;
+    if (tls_cert_get(&cert, &cert_len, &key, &key_len) != ESP_OK) {
+        ESP_LOGE(TAG, "no TLS cert; HTTPS/WSS disabled");
+        return;
+    }
+
+    httpd_ssl_config_t cfg = HTTPD_SSL_CONFIG_DEFAULT();
+    cfg.servercert = cert;
+    cfg.servercert_len = cert_len;
+    cfg.prvtkey_pem = key;
+    cfg.prvtkey_len = key_len;
+    cfg.port_secure = 443;
+    cfg.httpd.lru_purge_enable = true;
+    cfg.httpd.stack_size = 10240;     // TLS handshake needs more headroom
+    cfg.httpd.max_uri_handlers = 12;
+
+    httpd_handle_t server = NULL;
+    if (httpd_ssl_start(&server, &cfg) != ESP_OK) {
+        ESP_LOGE(TAG, "failed to start HTTPS server");
+        return;
+    }
+    register_routes(server);
+    ESP_LOGI(TAG, "web UI on https://%s/ (port 443); serial at wss://<ip>/serial", WIFI_AP_IP);
+}
+
+void http_status_start(void)
+{
+    start_http();
+    start_https();
 }

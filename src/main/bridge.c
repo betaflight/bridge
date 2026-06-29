@@ -31,6 +31,40 @@ void bridge_init(void)
     configASSERT(s_net_to_usb);
 }
 
+// Arbitration for the single FC stream. The claim is a tiny spinlock-guarded
+// owner field; the buffer reset must run outside the critical section.
+static portMUX_TYPE s_owner_mux = portMUX_INITIALIZER_UNLOCKED;
+static bridge_client_t s_owner = BRIDGE_CLIENT_NONE;
+
+bool bridge_try_claim(bridge_client_t who)
+{
+    bool ok = false;
+    taskENTER_CRITICAL(&s_owner_mux);
+    if (s_owner == BRIDGE_CLIENT_NONE) {
+        s_owner = who;
+        ok = true;
+    }
+    taskEXIT_CRITICAL(&s_owner_mux);
+    if (ok) {
+        bridge_reset();   // fresh session: drop any stale MSP bytes
+    }
+    return ok;
+}
+
+void bridge_release(bridge_client_t who)
+{
+    taskENTER_CRITICAL(&s_owner_mux);
+    if (s_owner == who) {
+        s_owner = BRIDGE_CLIENT_NONE;
+    }
+    taskEXIT_CRITICAL(&s_owner_mux);
+}
+
+bridge_client_t bridge_client_owner(void)
+{
+    return s_owner;
+}
+
 size_t bridge_usb_to_net_push(const uint8_t *data, size_t len)
 {
     // Zero timeout: never block the USB driver callback. Dropped bytes here are

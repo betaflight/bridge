@@ -11,6 +11,26 @@
 // push/pop helpers below.
 void bridge_init(void);
 
+// Which transport currently owns the FC byte stream. Only one Configurator
+// client may bridge at a time, shared across the raw-TCP server and the
+// WebSocket endpoint (the stream buffers are single-consumer).
+typedef enum {
+    BRIDGE_CLIENT_NONE = 0,
+    BRIDGE_CLIENT_TCP,
+    BRIDGE_CLIENT_WS,
+} bridge_client_t;
+
+// Atomically claim the FC stream for `who`. Returns true on success, or false if
+// another client already owns it. On success the buffers are reset and the
+// caller must bridge_release() when the client goes away.
+bool bridge_try_claim(bridge_client_t who);
+
+// Release a claim previously taken by `who` (no-op if `who` is not the owner).
+void bridge_release(bridge_client_t who);
+
+// The current owner, or BRIDGE_CLIENT_NONE when free.
+bridge_client_t bridge_client_owner(void);
+
 // FC -> Configurator. Called from the USB CDC RX callback context. Non-blocking;
 // returns the number of bytes actually queued (may be < len if the buffer is
 // full, which means the TCP side is not draining fast enough).

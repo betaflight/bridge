@@ -27,9 +27,15 @@ static void tcp_tx_task(void *arg)
 {
     static uint8_t buf[1024];
     while (1) {
-        size_t n = bridge_usb_to_net_pop(buf, sizeof(buf), 100);
         int fd = s_client;
-        if (n == 0 || fd < 0) {
+        if (fd < 0) {
+            // No TCP client: don't drain, or we'd steal bytes destined for a
+            // WebSocket client that owns the stream instead.
+            vTaskDelay(pdMS_TO_TICKS(20));
+            continue;
+        }
+        size_t n = bridge_usb_to_net_pop(buf, sizeof(buf), 100);
+        if (n == 0) {
             continue;
         }
         size_t off = 0;
@@ -50,12 +56,18 @@ static void tcp_tx_task(void *arg)
 
 static void serve_client(int fd)
 {
+    // One Configurator at a time, shared with the WebSocket endpoint.
+    if (!bridge_try_claim(BRIDGE_CLIENT_TCP)) {
+        ESP_LOGW(TAG, "client rejected: bridge busy");
+        close(fd);
+        return;
+    }
+
     // Low latency: push MSP frames out immediately rather than coalescing.
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 
-    bridge_reset();
-    s_client = fd;
+    s_client = fd;   // bridge_try_claim already reset the buffers
     ESP_LOGI(TAG, "client connected");
 
     uint8_t buf[1024];
@@ -76,6 +88,7 @@ static void serve_client(int fd)
     }
 
     s_client = -1;
+    bridge_release(BRIDGE_CLIENT_TCP);
     bridge_reset();
     close(fd);
 }

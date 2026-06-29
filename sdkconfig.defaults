@@ -13,7 +13,14 @@ CONFIG_USB_HOST_HW_BUFFER_BIAS_IN=y
 CONFIG_FREERTOS_HZ=1000
 
 # --- Main task / app ---
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+# Roomy: app_main generates the self-signed TLS cert on first boot (mbedTLS
+# key/cert writing is stack-hungry).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
+
+# --- HTTP server ---
+# WebSocket support: the web UI serves a ws:// (and wss:// over TLS) serial
+# endpoint so browsers can bridge to the FC (browsers can't open raw TCP).
+CONFIG_HTTPD_WS_SUPPORT=y
 
 # --- WiFi ---
 CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
