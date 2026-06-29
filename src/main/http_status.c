@@ -5,6 +5,7 @@
 #include "ota.h"
 #include "ws_serial.h"
 #include "tls_cert.h"
+#include "bridge.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -68,7 +69,7 @@ static const char PAGE[] =
     "<div class=\"tag\">USB-host &#8596; WiFi bridge for Betaflight [" BRIDGE_VERSION "]</div>"
     "<div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
-    "<tr><td class=\"k\">Configurator (TCP)</td><td id=\"tcp\">…</td></tr>"
+    "<tr><td class=\"k\">Configurator</td><td id=\"tcp\">…</td></tr>"
     "<tr><td class=\"k\">WiFi network</td><td id=\"sta\">…</td></tr>"
     "<tr><td class=\"k\">Signal</td><td id=\"rssi\">…</td></tr>"
     "<tr><td class=\"k\">IP address</td><td id=\"ip\">…</td></tr>"
@@ -101,7 +102,9 @@ static const char PAGE[] =
     "function bars(r){return r>=-55?'\\u2588':r>=-67?'\\u2586':r>=-78?'\\u2584':'\\u2582'}"
     "function status(){fetch('/status').then(function(r){return r.json()}).then(function(s){"
     "$('usb').innerHTML=s.usb.up?('<span class=\\\"up\\\">connected</span> <code>'+s.usb.id+'</code>'):'<span class=\\\"down\\\">waiting…</span>';"
-    "$('tcp').innerHTML=s.tcp.up?'<span class=\\\"up\\\">connected</span> :'+s.tcp.port:'<span class=\\\"down\\\">none</span> :'+s.tcp.port;"
+    "if(s.tcp.up){var v=s.tcp.via,l=v=='tcp'?'TCP :'+s.tcp.port:v=='wss'?'WebSocket (wss)':'WebSocket (ws)';"
+    "$('tcp').innerHTML='<span class=\\\"up\\\">connected</span> <code>'+l+'</code>';}"
+    "else $('tcp').innerHTML='<span class=\\\"down\\\">none</span>';"
     "var w=s.wifi,h;"
     "if(w.state=='connected')h='<span class=\\\"up\\\">'+w.ssid+'</span>';"
     "else if(w.state=='connecting')h='<span class=\\\"warn\\\">connecting to '+w.ssid+'…</span>';"
@@ -202,7 +205,12 @@ static esp_err_t status_get(httpd_req_t *req)
 {
     uint16_t vid = 0, pid = 0;
     bool usb = usb_cdc_host_status(&vid, &pid);
-    bool tcp = tcp_server_client_connected();
+
+    // Which transport the connected Configurator arrived on (one at a time).
+    bridge_client_t owner = bridge_client_owner();
+    const char *via = owner == BRIDGE_CLIENT_TCP ? "tcp"
+                    : owner == BRIDGE_CLIENT_WS  ? (ws_serial_is_secure() ? "wss" : "ws")
+                    : "none";
 
     wifi_status_t w;
     wifi_sta_status(&w);
@@ -220,12 +228,12 @@ static esp_err_t status_get(httpd_req_t *req)
     char body[700];
     int n = snprintf(body, sizeof(body),
         "{\"usb\":{\"up\":%s,\"id\":\"%04x:%04x\"},"
-        "\"tcp\":{\"up\":%s,\"port\":%d},"
+        "\"tcp\":{\"up\":%s,\"via\":\"%s\",\"port\":%d},"
         "\"wifi\":{\"state\":\"%s\",\"ap\":%s,\"ssid\":\"%s\","
         "\"ip\":\"%s\",\"gw\":\"%s\",\"netmask\":\"%s\",\"rssi\":%d},"
         "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}}",
         usb ? "true" : "false", vid, pid,
-        tcp ? "true" : "false", TCP_SERVER_PORT,
+        owner != BRIDGE_CLIENT_NONE ? "true" : "false", via, TCP_SERVER_PORT,
         state, w.ap_active ? "true" : "false", ssid_esc,
         w.ip, w.gw, w.netmask, w.rssi,
         ota_board_id(), slot, img_valid ? "true" : "false");
@@ -282,7 +290,7 @@ static esp_err_t wifi_post(httpd_req_t *req)
 // Attach the web UI + serial endpoints to a server (used for both the plain
 // HTTP and the TLS server, so the page and the ws/wss serial bridge are
 // reachable on either).
-static void register_routes(httpd_handle_t server)
+static void register_routes(httpd_handle_t server, bool secure)
 {
     const httpd_uri_t routes[] = {
         { .uri = "/",         .method = HTTP_GET,  .handler = root_get   },
@@ -294,8 +302,8 @@ static void register_routes(httpd_handle_t server)
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
         httpd_register_uri_handler(server, &routes[i]);
     }
-    ota_register(server);       // POST /update
-    ws_serial_register(server); // GET /serial (WebSocket)
+    ota_register(server);               // POST /update
+    ws_serial_register(server, secure); // GET /serial (WebSocket)
 }
 
 // Start the plain HTTP server on port 80 (web UI + ws:// serial).
@@ -312,7 +320,7 @@ static void start_http(void)
         ESP_LOGE(TAG, "failed to start HTTP server");
         return;
     }
-    register_routes(server);
+    register_routes(server, false);
     ESP_LOGI(TAG, "web UI on http://%s/ (port 80)", WIFI_AP_IP);
 }
 
@@ -342,7 +350,7 @@ static void start_https(void)
         ESP_LOGE(TAG, "failed to start HTTPS server");
         return;
     }
-    register_routes(server);
+    register_routes(server, true);
     ESP_LOGI(TAG, "web UI on https://%s/ (port 443); serial at wss://<ip>/serial", WIFI_AP_IP);
 }
 

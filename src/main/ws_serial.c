@@ -14,7 +14,13 @@ static const char *TAG = "ws";
 // fd (an fd is only meaningful within its httpd instance, so we keep both).
 static httpd_handle_t s_hd;
 static volatile int s_fd = -1;
+static volatile bool s_secure;   // current client arrived over TLS (wss)
 static TaskHandle_t s_tx_task;
+
+bool ws_serial_is_secure(void)
+{
+    return s_secure;
+}
 
 static void ws_drop(void)
 {
@@ -69,7 +75,8 @@ static esp_err_t ws_handler(httpd_req_t *req)
         bridge_try_claim(BRIDGE_CLIENT_WS);   // no-op if we already own it
         s_hd = req->handle;
         s_fd = new_fd;
-        ESP_LOGI(TAG, "client connected (fd %d)", new_fd);
+        s_secure = (req->user_ctx != NULL);   // set per-server at registration
+        ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;
     }
 
@@ -102,14 +109,17 @@ static esp_err_t ws_handler(httpd_req_t *req)
     return ret;
 }
 
-void ws_serial_register(httpd_handle_t server)
+void ws_serial_register(httpd_handle_t server, bool secure)
 {
-    static const httpd_uri_t uri = {
+    // user_ctx carries the secure flag so the handler can tell ws from wss.
+    const httpd_uri_t uri = {
         .uri = "/serial",
         .method = HTTP_GET,
         .handler = ws_handler,
         .is_websocket = true,
+        .handle_ws_control_frames = true,   // deliver CLOSE so we release the claim
         .supported_subprotocol = "wsSerial",
+        .user_ctx = secure ? (void *)1 : NULL,
     };
     httpd_register_uri_handler(server, &uri);
 
