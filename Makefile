@@ -18,6 +18,12 @@ IDF_TARGET := esp32s3
 # published per-board image is dist/$(PROJECT)-<board>.bin.
 PROJECT := betaflight-bridge
 
+# Firmware version. Single source of truth is the BRIDGE_VERSION #define in
+# src/main/version.h; we read it so an unversioned `make <board>` still stamps
+# and names the artefact with the coded default. Override with `make <board>
+# VERSION=x.y.z` (the release workflow passes the tag).
+VERSION ?= $(shell sed -n 's/^[[:space:]]*#define[[:space:]]\+BRIDGE_VERSION[[:space:]]\+"\(.*\)".*/\1/p' src/main/version.h)
+
 # Discover boards from the directory list — never hardcoded. Anything under
 # boards/ with an sdkconfig.defaults is a valid target.
 BOARDS := $(sort $(notdir $(patsubst %/sdkconfig.defaults,%,$(wildcard boards/*/sdkconfig.defaults))))
@@ -73,8 +79,12 @@ esp_tools:
 	echo "==> ESP-IDF ready. Build with: make <board>"
 
 # Published image name: dist/<project>-<board>[-<VERSION>].bin (version appended
-# when VERSION is set, e.g. by the release workflow).
-$(BOARDS): IMG = $(PROJECT)-$@$(if $(VERSION),-$(VERSION))
+# when VERSION is set, e.g. by the release workflow). Sanitise the version for
+# the filename only — release tags may contain '/' (e.g. release/v1.2.3), which
+# would otherwise turn the cp target into a nested path. -DBRIDGE_VERSION still
+# receives the original VERSION, so the UI shows the tag verbatim.
+VERSION_FILENAME := $(subst /,-,$(VERSION))
+$(BOARDS): IMG = $(PROJECT)-$@$(if $(VERSION_FILENAME),-$(VERSION_FILENAME))
 
 $(BOARDS):
 	@echo "==> Building $(PROJECT) for board: $@"
