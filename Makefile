@@ -72,6 +72,10 @@ esp_tools:
 	echo ""; \
 	echo "==> ESP-IDF ready. Build with: make <board>"
 
+# Published image name: dist/<project>-<board>[-<VERSION>].bin (version appended
+# when VERSION is set, e.g. by the release workflow).
+$(BOARDS): IMG = $(PROJECT)-$@$(if $(VERSION),-$(VERSION))
+
 $(BOARDS):
 	@echo "==> Building $(PROJECT) for board: $@"
 	@set -e; \
@@ -91,12 +95,12 @@ $(BOARDS):
 	fi; \
 	idf.py -DBOARD=$@ $(if $(VERSION),-DBRIDGE_VERSION=$(VERSION),) build; \
 	mkdir -p dist; \
-	cp build/$(PROJECT).bin dist/$(PROJECT)-$@.bin; \
+	cp build/$(PROJECT).bin dist/$(IMG).bin; \
 	echo "$@" > $(LAST_BOARD); \
 	echo ""; \
-	echo "==> Done. Flash/OTA image: dist/$(PROJECT)-$@.bin"; \
+	echo "==> Done. Flash/OTA image: dist/$(IMG).bin"; \
 	echo "    Serial flash:  idf.py -DBOARD=$@ -p <PORT> flash monitor"; \
-	echo "    OTA:           upload dist/$(PROJECT)-$@.bin from the web UI"
+	echo "    OTA:           upload dist/$(IMG).bin from the web UI"
 
 clean:
 	@if command -v idf.py >/dev/null 2>&1; then \
