@@ -41,7 +41,7 @@ static const char PAGE[] =
     ".tag{text-align:center;color:#8b9199;letter-spacing:.04em;margin:0 0 1.6rem}"
     ".card{background:#181b20;border:1px solid #262b32;border-radius:14px;padding:1.05rem 1.2rem;margin-bottom:1.1rem}"
     ".card:last-child{margin-bottom:0}"
-    "h2{text-transform:uppercase;letter-spacing:.1em;color:#FFBB00;margin:0 0 .75rem;font-weight:700}"
+    "h2{font-size:inherit;text-transform:uppercase;letter-spacing:.1em;color:#FFBB00;margin:0 0 .75rem;font-weight:700}"
     "table{border-collapse:collapse;width:100%}"
     "td{padding:.52rem .15rem;border-bottom:1px solid #23272e}"
     "tr:last-child td{border-bottom:0}"
