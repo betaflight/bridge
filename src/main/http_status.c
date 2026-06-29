@@ -51,7 +51,7 @@ static const char PAGE[] =
     ".warn{color:#FFBB00}"
     "code{color:#7fc7ff;font-family:ui-monospace,Menlo,monospace;font-size:.9rem}"
     "label{display:block;margin:.7rem 0 .25rem;color:#8b9199;font-size:.8rem}"
-    "select,input{width:100%;padding:.6rem .65rem;background:#0f1115;color:#e6e8ea;border:1px solid #2d333b;border-radius:9px;font-size:.96rem}"
+    "select,input{width:100%;padding:.6rem .65rem;background:#0f1115;color:#e6e8ea;border:1px solid #2d333b;border-radius:9px;font-size:.8rem}"
     "select:focus,input:focus{outline:none;border-color:#FFBB00}"
     "input[type=file]{padding:.45rem}"
     "input[type=file]::file-selector-button{background:#222831;color:#e6e8ea;border:1px solid #2d333b;border-radius:7px;padding:.35rem .7rem;margin-right:.6rem;cursor:pointer}"
