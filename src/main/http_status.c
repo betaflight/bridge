@@ -56,7 +56,7 @@ static const char PAGE[] =
     "input[type=file]{padding:.45rem}"
     "input[type=file]::file-selector-button{background:#222831;color:#e6e8ea;border:1px solid #2d333b;border-radius:7px;padding:.35rem .7rem;margin-right:.6rem;cursor:pointer}"
     ".btns{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;margin-top:.95rem}"
-    "button{padding:.6rem 1.15rem;background:#FFBB00;color:#15140e;border:0;border-radius:9px;font-size:.94rem;font-weight:700;cursor:pointer}"
+    "button{padding:.45rem .85rem;background:#FFBB00;color:#15140e;border:0;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer}"
     "button:hover{filter:brightness(1.08)}"
     "button.sec{background:#222831;color:#e6e8ea;border:1px solid #2d333b}"
     ".msg{margin-top:.7rem;min-height:1.2rem;font-size:.9rem;color:#9aa0a8}"
