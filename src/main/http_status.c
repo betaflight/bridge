@@ -40,6 +40,7 @@ static const char PAGE[] =
     ".logo svg{height:56px;width:auto}"
     ".tag{text-align:center;color:#8b9199;font-size:.83rem;letter-spacing:.04em;margin:0 0 1.6rem}"
     ".card{background:#181b20;border:1px solid #262b32;border-radius:14px;padding:1.05rem 1.2rem;margin-bottom:1.1rem}"
+    ".card:last-child{margin-bottom:0}"
     "h2{font-size:.73rem;text-transform:uppercase;letter-spacing:.1em;color:#FFBB00;margin:0 0 .75rem;font-weight:700}"
     "table{border-collapse:collapse;width:100%;font-size:.96rem}"
     "td{padding:.52rem .15rem;border-bottom:1px solid #23272e}"
