@@ -5,21 +5,84 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
-  build:
+  # Board list is read from boards/ — never hardcoded (matches the Makefile).
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      boards: ${{ steps.list.outputs.boards }}
     steps:
-      # The ESP-IDF CI action supplies its own pinned IDF, so we don't need the
-      # heavy esp-idf submodule here.
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - id: list
+        run: |
+          boards=$(for d in boards/*/sdkconfig.defaults; do
+                     b=${d#boards/}; echo "${b%/sdkconfig.defaults}"
+                   done | jq -R . | jq -cs .)
+          echo "boards=$boards" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # attach built images to the release
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJson(needs.discover.outputs.boards) }}
+    steps:
       - uses: actions/checkout@v4
         with:
           submodules: false
 
-      - name: Build (esp32s3)
-        uses: espressif/esp-idf-ci-action@v1
+      # The pinned ESP-IDF is a submodule; fetch it shallowly so install.sh can
+      # provision the matching toolchain.
+      - name: Fetch pinned ESP-IDF
+        run: git submodule update --init --depth 1 esp-idf
+
+      - name: ESP-IDF revision
+        id: idf
+        run: echo "sha=$(git -C esp-idf rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Cache the installed toolchain (~/.espressif) keyed on the pinned IDF, so
+      # install.sh becomes a near-instant no-op on subsequent runs.
+      - name: Cache ESP-IDF tools
+        uses: actions/cache@v4
         with:
-          # Docker image tag (hyphen, not slash) — matches the esp-idf submodule.
-          esp_idf_version: release-v5.4
-          target: esp32s3
-          path: '.'
+          path: ~/.espressif
+          key: esp-tools-${{ runner.os }}-${{ steps.idf.outputs.sha }}-esp32s3
+
+      # Cache the component-manager downloads keyed on the dependency lock.
+      - name: Cache managed components
+        uses: actions/cache@v4
+        with:
+          path: managed_components
+          key: managed-${{ runner.os }}-${{ hashFiles('src/main/idf_component.yml', 'dependencies.lock') }}
+
+      - name: Install ESP-IDF tools
+        run: ./esp-idf/install.sh esp32s3
+
+      # On a release, stamp the tag into the image; otherwise the default in
+      # http_status.c is used.
+      - name: Build ${{ matrix.board }}
+        env:
+          VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+        run: |
+          . ./esp-idf/export.sh
+          make ${{ matrix.board }} ${VERSION:+VERSION=$VERSION}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: betaflight-bridge-${{ matrix.board }}
+          path: dist/betaflight-bridge-${{ matrix.board }}.bin
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/betaflight-bridge-${{ matrix.board }}.bin

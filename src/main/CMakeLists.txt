@@ -29,3 +29,9 @@ idf_component_register(
         esp_app_format
         esp_driver_gpio
 )
+
+# The release workflow stamps the firmware version in with
+# `idf.py -DBRIDGE_VERSION=<tag>`; otherwise the default in http_status.c is used.
+if(DEFINED BRIDGE_VERSION)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE "BRIDGE_VERSION=\"${BRIDGE_VERSION}\"")
+endif()

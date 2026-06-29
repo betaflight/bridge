@@ -3,6 +3,7 @@
 #   make                 show this help (the board list is read from boards/)
 #   make esp_tools       fetch the ESP-IDF submodule and install the toolchain
 #   make <board>         build the flash/OTA image for <board>
+#   make <board> VERSION=x.y.z   stamp that version into the image (else default)
 #   make clean           remove build artefacts
 #
 # It sources the vendored ESP-IDF (./esp-idf/export.sh) automatically if idf.py
@@ -88,7 +89,7 @@ $(BOARDS):
 	  idf.py fullclean >/dev/null 2>&1 || true; \
 	  idf.py -DBOARD=$@ set-target $(IDF_TARGET); \
 	fi; \
-	idf.py -DBOARD=$@ build; \
+	idf.py -DBOARD=$@ $(if $(VERSION),-DBRIDGE_VERSION=$(VERSION),) build; \
 	mkdir -p dist; \
 	cp build/$(PROJECT).bin dist/$(PROJECT)-$@.bin; \
 	echo "$@" > $(LAST_BOARD); \
