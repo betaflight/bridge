@@ -5,5 +5,15 @@ dependencies:
   espressif/usb_host_cdc_acm: "^2.0.0"
   # WS2812 NeoPixel driver (RMT backend) for the status LED.
   espressif/led_strip: "^2.5.0"
+  # Board support (LCD panel + touch + LVGL glue) for boards with a display.
+  # Rule-gated: only fetched when the board enables CONFIG_BRIDGE_DISPLAY.
+  waveshare/esp32_s3_touch_lcd_4b:
+    version: "^2.0.0"
+    rules:
+      - if: "$CONFIG{BRIDGE_DISPLAY} == True"
+  lvgl/lvgl:
+    version: "^9.2.0"
+    rules:
+      - if: "$CONFIG{BRIDGE_DISPLAY} == True"
   idf:
     version: ">=5.0"

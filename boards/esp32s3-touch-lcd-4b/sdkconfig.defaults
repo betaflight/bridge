@@ -1,0 +1,31 @@
+# Waveshare ESP32-S3-Touch-LCD-4B (ESP32-S3 N16R8)
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/esp32s3-touch-lcd-4b/partitions.csv"
+
+# 8 MB octal PSRAM — holds the 480x480 RGB framebuffer.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# Keep the RGB panel fed alongside WiFi traffic.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# No USB-UART bridge on this board: console on the native USB-Serial-JTAG
+# (drops out once USB host mode engages), UART0 stays free on the header.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Board identity baked into the image and checked on OTA.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="esp32s3-touch-lcd-4b"
+
+# Native LVGL touch UI (pulls in the BSP + LVGL managed components).
+CONFIG_BRIDGE_DISPLAY=y
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y

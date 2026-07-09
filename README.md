@@ -47,6 +47,7 @@ on the shared top-level `sdkconfig.defaults`. The USB-host pins
 |-------|-------|-------|-----|-------------|
 | `esp32s3-zero` (default) | 4 MB | — | single (native) | NeoPixel (GPIO21) |
 | `esp32s3-wroom-freenove` | 8 MB | 8 MB octal | dual (native + UART) | WiFi LED (GPIO2) + NeoPixel (GPIO48) |
+| `esp32s3-touch-lcd-4b` | 16 MB | 8 MB octal | single (native) | 4" LCD touch UI |
 
 A board identity (`BOARD_NAME`) is baked into each image (`esp_app_desc.version`)
 and checked on OTA, so an image built for one board is refused on another (see
@@ -79,6 +80,24 @@ and checked on OTA, so an image built for one board is refused on another (see
   - **GPIO48** — on-board WS2812 NeoPixel, FC/OTG comms.
 - **Partitions:** 8 MB dual-OTA, ~3 MB per slot
   (`boards/esp32s3-wroom-freenove/partitions.csv`).
+
+### `esp32s3-touch-lcd-4b` — Waveshare ESP32-S3-Touch-LCD-4B
+
+- **MCU / memory:** ESP32-S3 N16R8 — 16 MB flash, 8 MB **octal** PSRAM
+  (holds the LCD framebuffer).
+- **Display:** 4.0" 480×480 IPS (ST7701, 16-bit parallel RGB565) with GT911
+  capacitive touch, driven by the Waveshare BSP + LVGL
+  (`CONFIG_BRIDGE_DISPLAY`). The screen shows the same status as the web page —
+  FC link, Configurator client, WiFi, IP — and offers on-screen WiFi
+  scan/join/forget with a touch keyboard.
+- **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
+  shared between flashing/console and the USB-host bridge — **the serial
+  console drops out once host mode engages**. UART0 (TX GPIO43 / RX GPIO44) is
+  broken out on the header for a persistent log console. Power the board from
+  its DC terminal or battery input when the USB-C is hosting the FC.
+- **LEDs:** none used — status is on the LCD.
+- **Partitions:** 16 MB dual-OTA, 6 MB per slot
+  (`boards/esp32s3-touch-lcd-4b/partitions.csv`).
 
 ### Status LED behaviour
 
