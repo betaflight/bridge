@@ -285,15 +285,19 @@ static void scan_list_rebuild(void)
 
 // wifi_scan() blocks for seconds — run it off the LVGL task and repopulate
 // the list under the display lock. One automatic scan shortly after boot,
-// then one per Rescan press.
+// then one per Rescan press. Scans land in a staging buffer: s_aps is only
+// written under the display lock, where ap_clicked() also reads it (LVGL
+// event callbacks run under the same mutex).
 static void scan_task(void *arg)
 {
     (void)arg;
+    static wifi_scan_ap_t aps[DISPLAY_MAX_APS];
     vTaskDelay(pdMS_TO_TICKS(2000));
     for (;;) {
-        int n = wifi_scan(s_aps, DISPLAY_MAX_APS);
+        int n = wifi_scan(aps, DISPLAY_MAX_APS);
         bsp_display_lock(0);
         s_ap_count = n;
+        memcpy(s_aps, aps, sizeof(aps));
         scan_list_rebuild();
         scan_busy(false);
         bsp_display_unlock();
@@ -424,14 +428,10 @@ static void build_ui(void)
 
 void display_start(void)
 {
-    ESP_LOGI(TAG, "DIAG: bsp_display_start()...");
-    vTaskDelay(pdMS_TO_TICKS(200));
     if (bsp_display_start() == NULL) {
         ESP_LOGE(TAG, "display init failed");
         return;
     }
-    ESP_LOGI(TAG, "DIAG: bsp up, building UI");
-    vTaskDelay(pdMS_TO_TICKS(200));
 
     bsp_display_lock(0);
     lv_theme_t *theme = lv_theme_default_init(lv_display_get_default(),
@@ -441,10 +441,11 @@ void display_start(void)
     lv_display_set_theme(lv_display_get_default(), theme);
     build_ui();
     bsp_display_unlock();
-    ESP_LOGI(TAG, "DIAG: UI built");
 
     s_scan_req = xSemaphoreCreateBinary();
-    xTaskCreate(scan_task, "wifi_scan", 4096, NULL, 3, NULL);
+    configASSERT(s_scan_req);
+    BaseType_t ok = xTaskCreate(scan_task, "wifi_scan", 4096, NULL, 3, NULL);
+    configASSERT(ok == pdTRUE);
 
     // Light the panel only after the first UI is in the framebuffer.
     bsp_display_backlight_on();
