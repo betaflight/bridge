@@ -10,6 +10,7 @@ idf_component_register(
         "tls_cert.c"
         "ota.c"
         "leds.c"
+        "display.c"
     EMBED_TXTFILES
         "icon.svg"                              # favicon served at /icon.svg
     INCLUDE_DIRS
@@ -28,6 +29,7 @@ idf_component_register(
         app_update
         esp_app_format
         esp_driver_gpio
+        esp_driver_i2c
 )
 
 # The release workflow stamps the firmware version in with

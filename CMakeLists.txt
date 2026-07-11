@@ -22,7 +22,20 @@ set(SDKCONFIG_DEFAULTS
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
+# Per-board dependency lock: boards with a display pull in extra managed
+# components (rule-gated in src/main/idf_component.yml), so a shared lock file
+# would be rewritten on every board switch.
+idf_build_set_property(DEPENDENCIES_LOCK "${CMAKE_CURRENT_LIST_DIR}/dependencies.lock.${BOARD}")
+
 # Sources live under src/main rather than the default ./main.
 set(EXTRA_COMPONENT_DIRS "src")
 
 project(betaflight-bridge)
+
+# The Waveshare BSPs use memcpy without including <string.h>; force the
+# include rather than patching the fetched component.
+idf_build_get_property(_components BUILD_COMPONENTS)
+if("waveshare__esp32_s3_touch_lcd_4b" IN_LIST _components)
+    idf_component_get_property(_bsp_lib waveshare__esp32_s3_touch_lcd_4b COMPONENT_LIB)
+    target_compile_options(${_bsp_lib} PRIVATE "SHELL:-include string.h")
+endif()

@@ -1,0 +1,13 @@
+menu "Betaflight bridge"
+
+    config BRIDGE_DISPLAY
+        bool "Native LVGL touch status display"
+        default n
+        help
+            Drive an on-board LCD with a native LVGL touch UI showing the
+            bridge status (FC link, Configurator client, WiFi, IP) and
+            offering WiFi scan/join. Enabled per-board via the board's
+            sdkconfig.defaults; pulls in the board BSP and LVGL managed
+            components, which are not fetched when disabled.
+
+endmenu

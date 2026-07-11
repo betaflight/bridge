@@ -6,7 +6,7 @@ sdkconfig.old
 
 # Component manager
 /managed_components/
-dependencies.lock
+dependencies.lock*
 
 # Editor / OS
 .vscode/

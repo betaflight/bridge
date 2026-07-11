@@ -56,12 +56,13 @@ jobs:
           path: ~/.espressif
           key: esp-tools-${{ runner.os }}-${{ steps.idf.outputs.sha }}-esp32s3
 
-      # Cache the component-manager downloads keyed on the dependency lock.
+      # Cache the component-manager downloads keyed on the manifest. Per-board:
+      # rule-gated dependencies resolve to different component sets per board.
       - name: Cache managed components
         uses: actions/cache@v4
         with:
           path: managed_components
-          key: managed-${{ runner.os }}-${{ hashFiles('src/main/idf_component.yml', 'dependencies.lock') }}
+          key: managed-${{ runner.os }}-${{ matrix.board }}-${{ hashFiles('src/main/idf_component.yml') }}
 
       - name: Install ESP-IDF tools
         run: ./esp-idf/install.sh esp32s3
