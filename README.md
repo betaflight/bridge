@@ -133,7 +133,7 @@ ESP-IDF is vendored as a submodule. After cloning this repo:
 ```sh
 # Host prerequisites (Debian/Ubuntu): ESP-IDF's installer needs a working
 # venv + pip to build its Python environment.
-sudo apt install git wget cmake ninja-build python3-venv python3-pip
+sudo apt install git wget cmake ninja-build python3-venv python3-pip libusb-1.0-0 libusb-1.0-0-dev
 
 # Fetch the pinned ESP-IDF submodule and install its toolchain.
 make esp_tools
