@@ -153,7 +153,7 @@ void ws_serial_register(httpd_handle_t server, bool secure)
         .handler = ws_handler,
         .is_websocket = true,
         .handle_ws_control_frames = true,   // deliver CLOSE so we release the claim
-        .supported_subprotocol = "wsSerial",
+        .supported_subprotocol = "binary",
         .user_ctx = secure ? &s_secure_marker : NULL,
     };
     httpd_register_uri_handler(server, &uri);
