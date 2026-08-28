@@ -205,7 +205,7 @@ Avahi browser) can find it without knowing the IP:
   `wss=443`, `path=/serial`, `board=<board>`, `version=<firmware>`
 - service `_http._tcp` on port 80 (the web UI)
 
-```
+```sh
 avahi-browse -rt _betaflight._tcp
 ```
 

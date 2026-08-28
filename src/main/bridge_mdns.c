@@ -24,6 +24,7 @@
 #include "ota.h"
 #include "version.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "esp_mac.h"
@@ -32,10 +33,16 @@
 
 static const char *TAG = "mdns";
 
-static char s_hostname[32];
+static char s_hostname[MDNS_NAME_BUF_LEN];
+static bool s_started;
 
 const char *bridge_mdns_hostname(void)
 {
+    // The responder renames itself (e.g. "-2") if the name collides on the
+    // network, so report what it is actually using.
+    if (s_started) {
+        mdns_hostname_get(s_hostname);
+    }
     return s_hostname;
 }
 
@@ -50,9 +57,6 @@ void bridge_mdns_start(void)
         ESP_LOGE(TAG, "mdns_init failed: %s", esp_err_to_name(err));
         return;
     }
-    mdns_hostname_set(s_hostname);
-    mdns_instance_name_set(s_hostname);
-
     char tcp_port[8];
     snprintf(tcp_port, sizeof(tcp_port), "%d", TCP_SERVER_PORT);
     mdns_txt_item_t txt[] = {
@@ -63,8 +67,23 @@ void bridge_mdns_start(void)
         { "board",   ota_board_id() },
         { "version", BRIDGE_VERSION },
     };
-    mdns_service_add(NULL, "_betaflight", "_tcp", TCP_SERVER_PORT, txt, sizeof(txt) / sizeof(txt[0]));
-    mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
 
+    err = mdns_hostname_set(s_hostname);
+    if (err == ESP_OK) {
+        err = mdns_instance_name_set(s_hostname);
+    }
+    if (err == ESP_OK) {
+        err = mdns_service_add(NULL, "_betaflight", "_tcp", TCP_SERVER_PORT, txt, sizeof(txt) / sizeof(txt[0]));
+    }
+    if (err == ESP_OK) {
+        err = mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "registration failed: %s", esp_err_to_name(err));
+        mdns_free();
+        return;
+    }
+
+    s_started = true;
     ESP_LOGI(TAG, "announcing %s.local (_betaflight._tcp:%d)", s_hostname, TCP_SERVER_PORT);
 }

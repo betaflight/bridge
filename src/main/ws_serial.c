@@ -115,19 +115,20 @@ static esp_err_t ws_handler(httpd_req_t *req)
             return ESP_FAIL;
         }
         int new_fd = httpd_req_to_sockfd(req);
+        ws_session_t *sess = malloc(sizeof(*sess));
+        if (!sess) {
+            return ESP_ERR_NO_MEM;
+        }
+        sess->hd = req->handle;
+        sess->fd = new_fd;
+        req->sess_ctx = sess;
+        req->free_ctx = ws_session_closed;
         if (s_fd >= 0 && !(s_hd == req->handle && s_fd == new_fd)) {
             httpd_sess_trigger_close(s_hd, s_fd);   // boot the previous client
         }
         bridge_try_claim(BRIDGE_CLIENT_WS);   // no-op if we already own it
         s_hd = req->handle;
         s_fd = new_fd;
-        ws_session_t *sess = malloc(sizeof(*sess));
-        if (sess) {
-            sess->hd = req->handle;
-            sess->fd = new_fd;
-            req->sess_ctx = sess;
-            req->free_ctx = ws_session_closed;
-        }
         s_secure = (req->user_ctx != NULL);   // set per-server at registration
         ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;
