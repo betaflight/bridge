@@ -28,6 +28,7 @@
 #include "tls_cert.h"
 #include "bridge.h"
 #include "version.h"
+#include "bridge_mdns.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -88,11 +89,13 @@ static const char PAGE[] =
     "<div class=\"tag\">USB-host &#8596; WiFi bridge for Betaflight [" BRIDGE_VERSION "]</div>"
     "<div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
-    "<tr><td class=\"k\">Configurator</td><td id=\"tcp\">…</td></tr>"
+    "<tr><td class=\"k\">Client</td><td id=\"tcp\">…</td></tr>"
     "<tr><td class=\"k\">WiFi network</td><td id=\"sta\">…</td></tr>"
     "<tr><td class=\"k\">Signal</td><td id=\"rssi\">…</td></tr>"
     "<tr><td class=\"k\">IP address</td><td id=\"ip\">…</td></tr>"
-    "<tr><td class=\"k\">Browser connect</td><td id=\"url\">…</td></tr>"
+    "<tr><td class=\"k\">mDNS name</td><td id=\"host\">…</td></tr>"
+    "<tr><td class=\"k\">TCP connect</td><td id=\"tcpurl\">…</td></tr>"
+    "<tr><td class=\"k\">Browser connect (wss)</td><td id=\"url\">…</td></tr>"
     "<tr><td class=\"k\">Gateway</td><td id=\"gw\">…</td></tr>"
     "<tr><td class=\"k\">Netmask</td><td id=\"mask\">…</td></tr>"
     "<tr><td class=\"k\">Access point</td><td id=\"ap\">…</td></tr>"
@@ -136,6 +139,8 @@ static const char PAGE[] =
     "$('rssi').innerHTML='<code>'+bars(rs)+'</code> '+q+' <code>'+rs+' dBm</code>';"
     "}else $('rssi').innerHTML='<span class=\\\"down\\\">—</span>';"
     "$('ip').innerHTML=w.ip?'<code>'+w.ip+'</code>':'<span class=\\\"down\\\">—</span>';"
+    "$('host').innerHTML=w.host?'<code>'+w.host+'</code>':'<span class=\\\"down\\\">—</span>';"
+    "$('tcpurl').innerHTML=w.ip?'<code>tcp://'+w.ip+':'+s.tcp.port+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('url').innerHTML=w.ip?'<code>wss://'+w.ip+'/serial</code>':'<span class=\\\"down\\\">—</span>';"
     "$('gw').innerHTML=w.gw?'<code>'+w.gw+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('mask').innerHTML=w.netmask?'<code>'+w.netmask+'</code>':'<span class=\\\"down\\\">—</span>';"
@@ -244,16 +249,16 @@ static esp_err_t status_get(httpd_req_t *req)
     bool img_valid = true;
     ota_running_info(slot, sizeof(slot), &img_valid);
 
-    char body[700];
+    char body[800];
     int n = snprintf(body, sizeof(body),
         "{\"usb\":{\"up\":%s,\"id\":\"%04x:%04x\"},"
         "\"tcp\":{\"up\":%s,\"via\":\"%s\",\"port\":%d},"
-        "\"wifi\":{\"state\":\"%s\",\"ap\":%s,\"ssid\":\"%s\","
+        "\"wifi\":{\"state\":\"%s\",\"ap\":%s,\"ssid\":\"%s\",\"host\":\"%s.local\","
         "\"ip\":\"%s\",\"gw\":\"%s\",\"netmask\":\"%s\",\"rssi\":%d},"
         "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}}",
         usb ? "true" : "false", vid, pid,
         owner != BRIDGE_CLIENT_NONE ? "true" : "false", via, TCP_SERVER_PORT,
-        state, w.ap_active ? "true" : "false", ssid_esc,
+        state, w.ap_active ? "true" : "false", ssid_esc, bridge_mdns_hostname(),
         w.ip, w.gw, w.netmask, w.rssi,
         ota_board_id(), slot, img_valid ? "true" : "false");
 

@@ -11,6 +11,7 @@ idf_component_register(
         "ota.c"
         "leds.c"
         "display.c"
+        "bridge_mdns.c"
     EMBED_TXTFILES
         "icon.svg"                              # favicon served at /icon.svg
     INCLUDE_DIRS
@@ -30,6 +31,7 @@ idf_component_register(
         esp_app_format
         esp_driver_gpio
         esp_driver_i2c
+        espressif__mdns
 )
 
 # The release workflow stamps the firmware version in with

@@ -20,6 +20,7 @@
  */
 
 #include "wifi.h"
+#include "bridge_mdns.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -288,6 +289,7 @@ void wifi_start(void)
     // AP only *broadcasts* once the mode includes it (see ensure_ap()).
     s_ap_netif  = esp_netif_create_default_wifi_ap();
     s_sta_netif = esp_netif_create_default_wifi_sta();
+    bridge_mdns_start();
 
     char ssid[33] = {0};
     char pass[65] = {0};
