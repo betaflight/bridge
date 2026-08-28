@@ -58,6 +58,24 @@ static void ws_drop(void)
     bridge_reset();
 }
 
+// Per-session marker so httpd tells us when the socket goes away for any reason
+// (abrupt disconnect, TLS teardown), not only on a CLOSE frame. Without this an
+// unclean drop leaves a dead client owning the bridge and locks out raw TCP.
+typedef struct {
+    httpd_handle_t hd;
+    int fd;
+} ws_session_t;
+
+static void ws_session_closed(void *ctx)
+{
+    ws_session_t *sess = ctx;
+    if (sess->hd == s_hd && sess->fd == s_fd) {
+        ESP_LOGI(TAG, "client gone (fd %d)", sess->fd);
+        ws_drop();
+    }
+    free(sess);
+}
+
 // FC -> WebSocket client. Drains the bridge and pushes binary frames to the
 // active client; a send failure means the client has gone, so we let go.
 static void ws_tx_task(void *arg)
@@ -103,6 +121,13 @@ static esp_err_t ws_handler(httpd_req_t *req)
         bridge_try_claim(BRIDGE_CLIENT_WS);   // no-op if we already own it
         s_hd = req->handle;
         s_fd = new_fd;
+        ws_session_t *sess = malloc(sizeof(*sess));
+        if (sess) {
+            sess->hd = req->handle;
+            sess->fd = new_fd;
+            req->sess_ctx = sess;
+            req->free_ctx = ws_session_closed;
+        }
         s_secure = (req->user_ctx != NULL);   // set per-server at registration
         ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;
@@ -153,7 +178,7 @@ void ws_serial_register(httpd_handle_t server, bool secure)
         .handler = ws_handler,
         .is_websocket = true,
         .handle_ws_control_frames = true,   // deliver CLOSE so we release the claim
-        .supported_subprotocol = "wsSerial",
+        .supported_subprotocol = "binary",   // what the app requests; must be echoed or the browser aborts
         .user_ctx = secure ? &s_secure_marker : NULL,
     };
     httpd_register_uri_handler(server, &uri);
