@@ -33,6 +33,10 @@
 // ws vs wss. The FC->client pump task is spawned on first call.
 void ws_serial_register(httpd_handle_t server, bool secure);
 
+// Close the connected WebSocket client, if any; the session close callback
+// releases the bridge.
+void ws_serial_kick(void);
+
 // True when the currently-connected WebSocket client arrived over TLS (wss).
 // Only meaningful while a WS client owns the bridge.
 bool ws_serial_is_secure(void);

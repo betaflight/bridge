@@ -25,6 +25,8 @@
 //   GET  /status  JSON snapshot of USB, TCP and WiFi state
 //   GET  /scan    JSON list of nearby networks
 //   POST /wifi    form-encoded ssid/pass; saves and joins live (empty = forget)
+//   POST /disconnect  drop the connected client (TCP or WebSocket)
+//   POST /reboot  restart the bridge
 #pragma once
 
 // Start the HTTP server. Call after WiFi is up.

@@ -49,6 +49,15 @@ bool ws_serial_is_secure(void)
     return bridge_client_owner() == BRIDGE_CLIENT_WS && s_secure;
 }
 
+void ws_serial_kick(void)
+{
+    int fd = s_fd;
+    if (fd >= 0 && s_hd) {
+        ESP_LOGI(TAG, "kicking client (fd %d)", fd);
+        httpd_sess_trigger_close(s_hd, fd);
+    }
+}
+
 static void ws_drop(void)
 {
     s_fd = -1;

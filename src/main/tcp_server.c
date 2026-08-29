@@ -43,6 +43,15 @@ bool tcp_server_client_connected(void)
     return s_client >= 0;
 }
 
+void tcp_server_kick(void)
+{
+    int fd = s_client;
+    if (fd >= 0) {
+        ESP_LOGI(TAG, "kicking client");
+        shutdown(fd, SHUT_RDWR);
+    }
+}
+
 // Drains FC->Configurator bytes from the bridge and writes them to the client.
 static void tcp_tx_task(void *arg)
 {

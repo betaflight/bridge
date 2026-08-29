@@ -35,3 +35,7 @@ void tcp_server_start(void);
 
 // True while a Configurator client is connected.
 bool tcp_server_client_connected(void);
+
+// Drop the connected client, if any. The serve loop notices and releases the
+// bridge; no-op when nobody is connected.
+void tcp_server_kick(void);

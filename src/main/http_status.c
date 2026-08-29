@@ -37,6 +37,9 @@
 #include "esp_http_server.h"
 #include "esp_https_server.h"
 #include "esp_log.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "http";
 
@@ -101,7 +104,10 @@ static const char PAGE[] =
     "<tr><td class=\"k\">Access point</td><td id=\"ap\">…</td></tr>"
     "<tr><td class=\"k\">Board</td><td id=\"board\">…</td></tr>"
     "<tr><td class=\"k\">Firmware slot</td><td id=\"slot\">…</td></tr>"
-    "</table></div>"
+    "</table>"
+    "<div class=\"btns\"><button class=\"sec\" onclick=\"kick()\">Disconnect client</button>"
+    "<button class=\"sec\" onclick=\"reboot()\">Restart bridge</button></div>"
+    "<div class=\"msg\" id=\"ctl\"></div></div>"
     "<div class=\"card\"><h2>Join a WiFi network</h2>"
     "<label for=\"ssid\">Network</label>"
     "<select id=\"ssid\" onchange=\"pick()\"><option value=\"\">— scanning… —</option>"
@@ -164,6 +170,11 @@ static const char PAGE[] =
     "function forget(){$('msg').textContent='Clearing…';"
     "fetch('/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='})"
     ".then(function(){$('msg').textContent='Stored network cleared.'})}"
+    "function kick(){$('ctl').textContent='Disconnecting…';"
+    "fetch('/disconnect',{method:'POST'}).then(function(r){$('ctl').textContent=r.ok?'Client disconnected.':'Request failed.'})"
+    ".catch(function(){$('ctl').textContent='Request failed.'})}"
+    "function reboot(){if(!confirm('Restart the bridge?'))return;$('ctl').textContent='Restarting — back in ~10s.';"
+    "fetch('/reboot',{method:'POST'}).catch(function(){});setTimeout(function(){location.reload()},12000)}"
     "function upload(){var f=$('fw').files[0];if(!f){$('up').textContent='Pick a .bin file.';return}"
     "var x=new XMLHttpRequest();x.open('POST','/update');"
     "x.upload.onprogress=function(e){if(e.lengthComputable)$('up').textContent='Uploading '+Math.round(e.loaded/e.total*100)+'%…'};"
@@ -311,6 +322,30 @@ static esp_err_t wifi_post(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+static esp_err_t disconnect_post(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "web request to disconnect client");
+    tcp_server_kick();
+    ws_serial_kick();
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+static void restart_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(300));   // let the response leave the socket
+    esp_restart();
+}
+
+static esp_err_t reboot_post(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "web request to restart");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t err = httpd_resp_sendstr(req, "{\"ok\":true}");
+    xTaskCreate(restart_task, "restart", 2048, NULL, 5, NULL);
+    return err;
+}
+
 // Attach the web UI + serial endpoints to a server (used for both the plain
 // HTTP and the TLS server, so the page and the ws/wss serial bridge are
 // reachable on either).
@@ -322,6 +357,8 @@ static void register_routes(httpd_handle_t server, bool secure)
         { .uri = "/status",   .method = HTTP_GET,  .handler = status_get },
         { .uri = "/scan",     .method = HTTP_GET,  .handler = scan_get   },
         { .uri = "/wifi",     .method = HTTP_POST, .handler = wifi_post  },
+        { .uri = "/disconnect", .method = HTTP_POST, .handler = disconnect_post },
+        { .uri = "/reboot",   .method = HTTP_POST, .handler = reboot_post },
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); i++) {
         httpd_register_uri_handler(server, &routes[i]);
