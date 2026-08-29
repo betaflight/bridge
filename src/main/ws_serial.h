@@ -22,7 +22,8 @@
 // WebSocket serial endpoint. Browsers can't open raw TCP, so this exposes the
 // FC byte stream over a WebSocket at /serial — reachable as ws:// on the plain
 // HTTP server and wss:// on the TLS server. Transparent binary bridge, like the
-// raw-TCP server; only one Configurator client bridges at a time (see bridge.c).
+// raw-TCP server; one client bridges at a time and the newest connection wins
+// (see bridge.c).
 #pragma once
 
 #include <stdbool.h>
@@ -32,6 +33,10 @@
 // instance — pass secure=true for the TLS server so the status page can report
 // ws vs wss. The FC->client pump task is spawned on first call.
 void ws_serial_register(httpd_handle_t server, bool secure);
+
+// Close the connected WebSocket client, if any; the session close callback
+// releases the bridge.
+void ws_serial_kick(void);
 
 // True when the currently-connected WebSocket client arrived over TLS (wss).
 // Only meaningful while a WS client owns the bridge.

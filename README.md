@@ -25,9 +25,10 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 |------|------|
 | `src/main/main.c` | Startup: NVS, bridge, WiFi, TCP server, USB host |
 | `src/main/usb_cdc_host.c` | USB host + CDC-ACM; opens the FC VCP, pumps bytes |
-| `src/main/tcp_server.c` | TCP listener on 5761; one Configurator client at a time |
+| `src/main/tcp_server.c` | TCP listener on 5761; one client at a time, newest connection wins |
 | `src/main/ws_serial.c` | WebSocket serial endpoint (`/serial`) for browser clients — ws:// and wss:// |
 | `src/main/tls_cert.c` | Self-signed TLS cert generated on first boot, persisted in NVS |
+| `src/main/bridge_mdns.c` | mDNS responder: `betaflight-bridge-<mac>.local`, `_betaflight._tcp` service |
 | `src/main/wifi.c` | Station-first WiFi: joins a stored network, SoftAP fallback, creds in NVS |
 | `src/main/http_status.c` | Web UI on 80 (HTTP) and 443 (HTTPS): status + scan/join + firmware upload + `/serial` |
 | `src/main/ota.c` | `POST /update` OTA handler; streams an uploaded .bin into the spare slot |
@@ -193,6 +194,21 @@ router assigns (shown on the page). If that network is ever unreachable at boot,
 the SoftAP comes back up automatically so you can reconfigure. Use *Forget* on
 the page to clear the stored network and return to AP-only setup mode.
 
+### Discovery (mDNS)
+
+The bridge announces itself on the local network so the app (or any Bonjour /
+Avahi browser) can find it without knowing the IP:
+
+- hostname `betaflight-bridge-<mac6>.local` (last three bytes of the WiFi MAC,
+  unique per unit; shown on the status page)
+- service `_betaflight._tcp` on port 5761 with TXT records `tcp=5761`, `ws=80`,
+  `wss=443`, `path=/serial`, `board=<board>`, `version=<firmware>`
+- service `_http._tcp` on port 80 (the web UI)
+
+```sh
+avahi-browse -rt _betaflight._tcp
+```
+
 ### Connecting from a browser (WebSocket / WSS)
 
 The desktop (Tauri) and Android (Capacitor) apps connect over the raw **TCP**
@@ -241,9 +257,9 @@ on the status page.
 
 - Known FC VCP USB IDs (ST / Artery / Geehy) are listed in `usb_cdc_host.c`;
   add new vendors there.
-- Single client at a time — one Configurator connection, shared across the TCP
-  and WebSocket transports (a new browser connection supersedes a stale one; a
-  raw-TCP client in progress is left alone).
+- Single client at a time — one connection, shared across the TCP and
+  WebSocket transports. The newest connection wins: connecting from another
+  device (or a browser reconnecting) drops the current client.
 - `TCP_NODELAY` is set and Nagle effectively disabled to keep MSP latency low.
 
 ## Licence

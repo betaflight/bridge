@@ -19,15 +19,15 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Web UI on port 80. Serves a live status page (USB/TCP/WiFi state) and lets the
-// user scan for and join a WiFi network; credentials are stored for future use.
-//   GET  /        HTML page (status + WiFi join form)
-//   GET  /status  JSON snapshot of USB, TCP and WiFi state
-//   GET  /scan    JSON list of nearby networks
-//   POST /wifi    form-encoded ssid/pass; saves and joins live (empty = forget)
-//   POST /disconnect  drop the connected client (TCP or WebSocket)
-//   POST /reboot  restart the bridge
+// mDNS announcement so the app can find the bridge on the LAN without knowing
+// its IP. Hostname is betaflight-bridge-<mac6>.local (unique per unit). Services:
+//   _betaflight._tcp  port 5761, TXT: tcp, ws, wss, path, board, version
+//   _http._tcp        port 80 (generic Bonjour/Avahi browsers)
 #pragma once
 
-// Start the HTTP server. Call after WiFi is up.
-void http_status_start(void);
+// Start the responder. Call once after the WiFi netifs exist; it follows
+// whichever interface (STA or SoftAP) is up.
+void bridge_mdns_start(void);
+
+// Advertised hostname without the ".local" suffix, e.g. "betaflight-bridge-a1b2c3".
+const char *bridge_mdns_hostname(void);

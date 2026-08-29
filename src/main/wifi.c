@@ -20,6 +20,7 @@
  */
 
 #include "wifi.h"
+#include "bridge_mdns.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -282,12 +283,17 @@ void wifi_start(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    // Modem sleep (the default) drops multicast between DTIM beacons, so mDNS
+    // queries go unanswered for seconds at a time and browsers expire the
+    // bridge. The board is USB powered; keep the radio awake.
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     // Both interfaces exist up front: the STA must be present for scanning and
     // live joins, and the AP netif must exist so the fallback can raise it. The
     // AP only *broadcasts* once the mode includes it (see ensure_ap()).
     s_ap_netif  = esp_netif_create_default_wifi_ap();
     s_sta_netif = esp_netif_create_default_wifi_sta();
+    bridge_mdns_start();
 
     char ssid[33] = {0};
     char pass[65] = {0};

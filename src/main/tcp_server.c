@@ -20,8 +20,10 @@
  */
 
 #include "tcp_server.h"
+#include "ws_serial.h"
 #include "bridge.h"
 
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 
@@ -43,75 +45,68 @@ bool tcp_server_client_connected(void)
     return s_client >= 0;
 }
 
-// Drains FC->Configurator bytes from the bridge and writes them to the client.
-static void tcp_tx_task(void *arg)
+void tcp_server_kick(void)
 {
-    static uint8_t buf[1024];
-    while (1) {
-        int fd = s_client;
-        if (fd < 0) {
-            // No TCP client: don't drain, or we'd steal bytes destined for a
-            // WebSocket client that owns the stream instead.
-            vTaskDelay(pdMS_TO_TICKS(20));
-            continue;
-        }
-        size_t n = bridge_usb_to_net_pop(buf, sizeof(buf), 100);
-        if (n == 0) {
-            continue;
-        }
-        size_t off = 0;
-        while (off < n) {
-            int sent = send(fd, buf + off, n - off, 0);
-            if (sent < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    vTaskDelay(pdMS_TO_TICKS(2));
-                    continue;
-                }
-                ESP_LOGW(TAG, "send failed: errno %d", errno);
-                break;  // accept task will notice on its next recv
-            }
-            off += sent;
-        }
+    int fd = s_client;
+    if (fd >= 0) {
+        ESP_LOGI(TAG, "kicking client");
+        // shutdown() makes the fd readable in the accept task's select(), which
+        // then reaps it via close_client(). (A bare recv() would not wake, but
+        // select() does.)
+        shutdown(fd, SHUT_RDWR);
     }
 }
 
-static void serve_client(int fd)
+// Send FC->Configurator bytes to the connected TCP client. Called by the single
+// net TX pump (ws_serial.c) only while the TCP client owns the bridge.
+void tcp_server_send(const uint8_t *data, size_t len)
 {
-    // One Configurator at a time, shared with the WebSocket endpoint.
-    if (!bridge_try_claim(BRIDGE_CLIENT_TCP)) {
-        ESP_LOGW(TAG, "client rejected: bridge busy");
-        close(fd);
+    int fd = s_client;
+    if (fd < 0) {
         return;
     }
-
-    // Low latency: push MSP frames out immediately rather than coalescing.
-    int one = 1;
-    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
-
-    s_client = fd;   // bridge_try_claim already reset the buffers
-    ESP_LOGI(TAG, "client connected");
-
-    uint8_t buf[1024];
-    while (1) {
-        int n = recv(fd, buf, sizeof(buf), 0);
-        if (n > 0) {
-            bridge_net_to_usb_push(buf, n);
-        } else if (n == 0) {
-            ESP_LOGI(TAG, "client closed");
-            break;
-        } else {
-            if (errno == EINTR) {
+    size_t off = 0;
+    while (off < len) {
+        int sent = send(fd, data + off, len - off, 0);
+        if (sent < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                vTaskDelay(pdMS_TO_TICKS(2));
                 continue;
             }
-            ESP_LOGW(TAG, "recv failed: errno %d", errno);
-            break;
+            ESP_LOGW(TAG, "send failed: errno %d", errno);
+            return;   // accept task's select() notices the dead socket
         }
+        off += sent;
     }
+}
 
+// Drop the served client, if any, releasing the bridge only while we still own
+// it (a WebSocket client may have taken over). Closes the socket.
+static void close_client(void)
+{
+    int fd = s_client;
+    if (fd < 0) {
+        return;
+    }
     s_client = -1;
-    bridge_release(BRIDGE_CLIENT_TCP);
-    bridge_reset();
+    if (bridge_client_owner() == BRIDGE_CLIENT_TCP) {
+        bridge_release(BRIDGE_CLIENT_TCP);
+    }
     close(fd);
+}
+
+// Adopt a freshly accepted client as the single served connection, taking the
+// bridge over from any current owner (newest connection wins).
+static void adopt_client(int fd)
+{
+    int one = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));  // low MSP latency
+    s_client = fd;
+    // Take the bridge over from any owner (incl. a WebSocket client). Its own
+    // task notices the ownership change and drops it; we do not reach across
+    // transports here, which would risk blocking the httpd worker.
+    bridge_claim(BRIDGE_CLIENT_TCP);
+    ESP_LOGI(TAG, "client connected");
 }
 
 static void tcp_accept_task(void *arg)
@@ -146,20 +141,75 @@ static void tcp_accept_task(void *arg)
 
     ESP_LOGI(TAG, "listening on port %d", TCP_SERVER_PORT);
 
+    // Single task, single served client. select() watches the listener and the
+    // client together: a pending connection wakes us to accept it (dropping the
+    // current client — newest wins), and the client fd wakes us on data or on
+    // close/shutdown (so a kick via tcp_server_kick() is noticed immediately).
+    // Keeping one task and closing the old socket on takeover avoids leaking
+    // sockets into lwIP's small descriptor table.
+    static uint8_t buf[1024];
     while (1) {
-        struct sockaddr_in src;
-        socklen_t slen = sizeof(src);
-        int fd = accept(listen_fd, (struct sockaddr *)&src, &slen);
-        if (fd < 0) {
-            ESP_LOGW(TAG, "accept() failed: errno %d", errno);
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(listen_fd, &rfds);
+        int maxfd = listen_fd;
+        int client = s_client;
+        if (client >= 0) {
+            FD_SET(client, &rfds);
+            if (client > maxfd) {
+                maxfd = client;
+            }
+        }
+
+        // 200 ms timeout so we poll ownership even when idle: a WebSocket
+        // client may have taken the bridge, in which case we drop ours.
+        struct timeval tv = { .tv_sec = 0, .tv_usec = 200000 };
+        if (select(maxfd + 1, &rfds, NULL, NULL, &tv) < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            ESP_LOGW(TAG, "select() failed: errno %d", errno);
+            vTaskDelay(pdMS_TO_TICKS(20));
             continue;
         }
-        serve_client(fd);  // blocks until this client disconnects
+
+        // Superseded by a client on the other transport: drop ours.
+        if (client >= 0 && bridge_client_owner() != BRIDGE_CLIENT_TCP) {
+            ESP_LOGI(TAG, "superseded; dropping client");
+            close_client();
+            continue;
+        }
+
+        // Client activity: data to forward, or a closed/kicked socket to reap.
+        if (client >= 0 && FD_ISSET(client, &rfds)) {
+            int n = recv(client, buf, sizeof(buf), 0);
+            if (n > 0) {
+                bridge_net_to_usb_push(buf, n);
+            } else {
+                ESP_LOGI(TAG, "client %s", n == 0 ? "closed" : "gone");
+                close_client();
+            }
+        }
+
+        // A new connection is pending: accept it and let it take over.
+        if (FD_ISSET(listen_fd, &rfds)) {
+            struct sockaddr_in src;
+            socklen_t slen = sizeof(src);
+            int fd = accept(listen_fd, (struct sockaddr *)&src, &slen);
+            if (fd < 0) {
+                ESP_LOGW(TAG, "accept() failed: errno %d", errno);
+                continue;
+            }
+            if (s_client >= 0) {
+                ESP_LOGI(TAG, "new client; dropping current TCP client");
+                close_client();
+            }
+            adopt_client(fd);   // claims the bridge; a WS owner drops itself
+        }
     }
 }
 
 void tcp_server_start(void)
 {
-    xTaskCreate(tcp_tx_task, "tcp_tx", 4096, NULL, 6, NULL);
     xTaskCreate(tcp_accept_task, "tcp_accept", 4096, NULL, 5, NULL);
 }

@@ -20,10 +20,13 @@
  */
 
 // TCP server that Betaflight Configurator connects to (TCP transport, MSP over a
-// raw stream). Accepts a single client at a time and bridges it to the FC VCP.
+// raw stream). One client at a time is bridged to the FC VCP; a new connection
+// takes over from the current one (TCP or WebSocket).
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 // Default listen port. Matches Betaflight SITL / Configurator's TCP default.
 #ifndef TCP_SERVER_PORT
@@ -35,3 +38,11 @@ void tcp_server_start(void);
 
 // True while a Configurator client is connected.
 bool tcp_server_client_connected(void);
+
+// Drop the connected client, if any. The serve loop notices and releases the
+// bridge; no-op when nobody is connected.
+void tcp_server_kick(void);
+
+// Send FC bytes to the connected TCP client (no-op if none). Called by the
+// single net TX pump while a TCP client owns the bridge.
+void tcp_server_send(const uint8_t *data, size_t len);
