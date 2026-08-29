@@ -22,7 +22,9 @@
 #include "bridge.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/stream_buffer.h"
+#include "freertos/semphr.h"
 
 // Sized for MSP traffic: frames are small but dumps (e.g. `diff all`, blackbox
 // config) can burst several KB. 8 KB each direction gives comfortable slack.
@@ -33,6 +35,10 @@
 
 static StreamBufferHandle_t s_usb_to_net;  // FC  -> Configurator
 static StreamBufferHandle_t s_net_to_usb;  // Configurator -> FC
+// One receiver at a time per buffer: a client-takeover reset must never run
+// concurrently with a pump task blocked in xStreamBufferReceive (that asserts).
+static SemaphoreHandle_t s_u2n_mux;   // guards receives from s_usb_to_net
+static SemaphoreHandle_t s_n2u_mux;   // guards receives from s_net_to_usb
 
 // Total bytes moved to/from the FC in either direction. Monotonic; sampled by
 // the LED indicator to detect traffic. Plain increments are fine — a missed
@@ -48,8 +54,12 @@ void bridge_init(void)
 {
     s_usb_to_net = xStreamBufferCreate(BRIDGE_BUF_SIZE, BRIDGE_TRIGGER);
     s_net_to_usb = xStreamBufferCreate(BRIDGE_BUF_SIZE, BRIDGE_TRIGGER);
+    s_u2n_mux = xSemaphoreCreateMutex();
+    s_n2u_mux = xSemaphoreCreateMutex();
     configASSERT(s_usb_to_net);
     configASSERT(s_net_to_usb);
+    configASSERT(s_u2n_mux);
+    configASSERT(s_n2u_mux);
 }
 
 // Arbitration for the single FC stream. The claim is a tiny spinlock-guarded
@@ -57,19 +67,14 @@ void bridge_init(void)
 static portMUX_TYPE s_owner_mux = portMUX_INITIALIZER_UNLOCKED;
 static bridge_client_t s_owner = BRIDGE_CLIENT_NONE;
 
-bool bridge_try_claim(bridge_client_t who)
+void bridge_claim(bridge_client_t who)
 {
-    bool ok = false;
+    // Newest client wins: take ownership unconditionally. The previous owner's
+    // teardown is gated on still owning, so it won't release this claim.
     taskENTER_CRITICAL(&s_owner_mux);
-    if (s_owner == BRIDGE_CLIENT_NONE) {
-        s_owner = who;
-        ok = true;
-    }
+    s_owner = who;
     taskEXIT_CRITICAL(&s_owner_mux);
-    if (ok) {
-        bridge_reset();   // fresh session: drop any stale MSP bytes
-    }
-    return ok;
+    bridge_reset();   // fresh session: drop any stale MSP bytes
 }
 
 void bridge_release(bridge_client_t who)
@@ -97,7 +102,10 @@ size_t bridge_usb_to_net_push(const uint8_t *data, size_t len)
 
 size_t bridge_usb_to_net_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms)
 {
-    return xStreamBufferReceive(s_usb_to_net, out, max_len, pdMS_TO_TICKS(timeout_ms));
+    xSemaphoreTake(s_u2n_mux, portMAX_DELAY);
+    size_t n = xStreamBufferReceive(s_usb_to_net, out, max_len, pdMS_TO_TICKS(timeout_ms));
+    xSemaphoreGive(s_u2n_mux);
+    return n;
 }
 
 size_t bridge_net_to_usb_push(const uint8_t *data, size_t len)
@@ -109,15 +117,25 @@ size_t bridge_net_to_usb_push(const uint8_t *data, size_t len)
 
 size_t bridge_net_to_usb_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms)
 {
-    return xStreamBufferReceive(s_net_to_usb, out, max_len, pdMS_TO_TICKS(timeout_ms));
+    xSemaphoreTake(s_n2u_mux, portMAX_DELAY);
+    size_t n = xStreamBufferReceive(s_net_to_usb, out, max_len, pdMS_TO_TICKS(timeout_ms));
+    xSemaphoreGive(s_n2u_mux);
+    return n;
+}
+
+// xStreamBufferReset() asserts if a task is blocked receiving on the buffer, so
+// drain under the same mutex the pump tasks use to read it.
+static void drain(StreamBufferHandle_t sb, SemaphoreHandle_t mux)
+{
+    uint8_t junk[64];
+    xSemaphoreTake(mux, portMAX_DELAY);
+    while (xStreamBufferReceive(sb, junk, sizeof(junk), 0) > 0) {
+    }
+    xSemaphoreGive(mux);
 }
 
 void bridge_reset(void)
 {
-    if (s_usb_to_net) {
-        xStreamBufferReset(s_usb_to_net);
-    }
-    if (s_net_to_usb) {
-        xStreamBufferReset(s_net_to_usb);
-    }
+    drain(s_usb_to_net, s_u2n_mux);
+    drain(s_net_to_usb, s_n2u_mux);
 }

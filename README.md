@@ -25,7 +25,7 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 |------|------|
 | `src/main/main.c` | Startup: NVS, bridge, WiFi, TCP server, USB host |
 | `src/main/usb_cdc_host.c` | USB host + CDC-ACM; opens the FC VCP, pumps bytes |
-| `src/main/tcp_server.c` | TCP listener on 5761; one Configurator client at a time |
+| `src/main/tcp_server.c` | TCP listener on 5761; one client at a time, newest connection wins |
 | `src/main/ws_serial.c` | WebSocket serial endpoint (`/serial`) for browser clients — ws:// and wss:// |
 | `src/main/tls_cert.c` | Self-signed TLS cert generated on first boot, persisted in NVS |
 | `src/main/bridge_mdns.c` | mDNS responder: `betaflight-bridge-<mac>.local`, `_betaflight._tcp` service |
@@ -257,9 +257,9 @@ on the status page.
 
 - Known FC VCP USB IDs (ST / Artery / Geehy) are listed in `usb_cdc_host.c`;
   add new vendors there.
-- Single client at a time — one Configurator connection, shared across the TCP
-  and WebSocket transports (a new browser connection supersedes a stale one; a
-  raw-TCP client in progress is left alone).
+- Single client at a time — one connection, shared across the TCP and
+  WebSocket transports. The newest connection wins: connecting from another
+  device (or a browser reconnecting) drops the current client.
 - `TCP_NODELAY` is set and Nagle effectively disabled to keep MSP latency low.
 
 ## Licence

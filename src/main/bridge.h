@@ -32,19 +32,20 @@
 // push/pop helpers below.
 void bridge_init(void);
 
-// Which transport currently owns the FC byte stream. Only one Configurator
-// client may bridge at a time, shared across the raw-TCP server and the
-// WebSocket endpoint (the stream buffers are single-consumer).
+// Which transport currently owns the FC byte stream. Only one client bridges
+// at a time, shared across the raw-TCP server and the WebSocket endpoint (the
+// stream buffers are single-consumer). A new connection on either transport
+// takes over: the transports kick the current owner and bridge_claim().
 typedef enum {
     BRIDGE_CLIENT_NONE = 0,
     BRIDGE_CLIENT_TCP,
     BRIDGE_CLIENT_WS,
 } bridge_client_t;
 
-// Atomically claim the FC stream for `who`. Returns true on success, or false if
-// another client already owns it. On success the buffers are reset and the
-// caller must bridge_release() when the client goes away.
-bool bridge_try_claim(bridge_client_t who);
+// Claim the FC stream for `who`, taking it over from any current owner (newest
+// client wins). The buffers are reset; the caller must bridge_release() when its
+// client goes away, but only while it still owns (see bridge_client_owner()).
+void bridge_claim(bridge_client_t who);
 
 // Release a claim previously taken by `who` (no-op if `who` is not the owner).
 void bridge_release(bridge_client_t who);
