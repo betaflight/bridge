@@ -21,8 +21,8 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
 # WebSocket support: the web UI serves a ws:// (and wss:// over TLS) serial
 # endpoint so browsers can bridge to the FC (browsers can't open raw TCP).
 CONFIG_HTTPD_WS_SUPPORT=y
-# Desktop browsers (Edge/Chrome) send a large header block — sec-ch-ua*,
-# sec-fetch-*, priority, long Accept/User-Agent — that overflows the 512-byte
+# Desktop browsers (Edge/Chrome) send a large header block - sec-ch-ua*,
+# sec-fetch-*, priority, long Accept/User-Agent - that overflows the 512-byte
 # default and trips "Header fields are too long". 2 KB clears a real request.
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
 

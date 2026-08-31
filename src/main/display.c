@@ -446,8 +446,312 @@ void display_start(void)
     configASSERT(s_scan_req);
     BaseType_t ok = xTaskCreate(scan_task, "wifi_scan", 4096, NULL, 3, NULL);
     configASSERT(ok == pdTRUE);
-
     // Light the panel only after the first UI is in the framebuffer.
+    bsp_display_backlight_on();
+
+    ESP_LOGI(TAG, "display ready");
+}
+
+#elif CONFIG_BRIDGE_HGLRC_DISPLAY
+
+#include <stdio.h>
+#include <string.h>
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+
+#include "lvgl.h"
+
+#include "lcd_st7789.h"
+#include "hglrc_logo.h"
+#include "adc_voltage.h"
+#include "wifi.h"
+#include "usb_cdc_host.h"
+#include "tcp_server.h"
+#include "bridge.h"
+#include "ws_serial.h"
+
+LV_FONT_DECLARE(ui_font_size14);
+LV_FONT_DECLARE(ui_font_size24);
+
+static const char *TAG = "hglrc_display";
+
+#define COL_BG      0x0f1115
+#define COL_CARD    0x181b20
+#define COL_BORDER  0x262b32
+#define COL_TEXT    0xe6e8ea
+#define COL_KEY     0x8b9199
+#define COL_UP      0x46c66d
+#define COL_DOWN    0x6b7178
+#define COL_WARN    0xFFBB00
+#define COL_ACCENT  0xFFBB00
+#define COL_MONO    0x7fc7ff
+
+#define REFRESH_MS 500
+
+static lv_obj_t *s_compact_fc;
+static lv_obj_t *s_compact_client;
+static lv_obj_t *s_compact_wifi;
+static lv_obj_t *s_compact_address[3];
+static lv_obj_t *s_compact_address_key;
+static lv_obj_t *s_compact_status;
+static lv_obj_t *s_compact_voltage;
+static lv_obj_t *s_compact_qr;
+static lv_obj_t *s_compact_qr_hint;
+static char s_compact_qr_url[64];
+
+static void set_value(lv_obj_t *label, const char *text, uint32_t colour)
+{
+    if (strcmp(lv_label_get_text(label), text) != 0) {
+        lv_label_set_text(label, text);
+    }
+    lv_obj_set_style_text_color(label, lv_color_hex(colour), 0);
+}
+
+static lv_obj_t *compact_value(lv_obj_t *parent, const char *key, int y)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    lv_obj_set_pos(label, 76, y);
+    lv_obj_set_size(label, 98, 19);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(label, &ui_font_size14, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(COL_TEXT), 0);
+
+    lv_obj_t *caption = lv_label_create(parent);
+    lv_label_set_text(caption, key);
+    lv_obj_set_pos(caption, 10, y);
+    lv_obj_set_size(caption, 62, 19);
+    lv_obj_set_style_text_font(caption, &ui_font_size14, 0);
+    lv_obj_set_style_text_color(caption, lv_color_hex(COL_KEY), 0);
+    if (strcmp(key, "IP") == 0) {
+        s_compact_address_key = caption;
+    }
+    return label;
+}
+
+static lv_obj_t *compact_address_value(lv_obj_t *parent, int y)
+{
+    lv_obj_t *label = lv_label_create(parent);
+    lv_obj_set_pos(label, 76, y);
+    lv_obj_set_size(label, 108, 16);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_font(label, &ui_font_size14, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(COL_TEXT), 0);
+    return label;
+}
+
+static void compact_card(lv_obj_t *parent, int x, int y, int w, int h)
+{
+    lv_obj_t *card = lv_obj_create(parent);
+    lv_obj_set_pos(card, x, y);
+    lv_obj_set_size(card, w, h);
+    lv_obj_set_style_bg_color(card, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(COL_BORDER), 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_radius(card, 8, 0);
+    lv_obj_set_style_pad_all(card, 0, 0);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+}
+
+static void compact_refresh_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    char buf[64];
+
+    uint16_t vid = 0;
+    uint16_t pid = 0;
+    if (usb_cdc_host_status(&vid, &pid)) {
+        set_value(s_compact_fc, "CONNECTED", COL_UP);
+    } else {
+        set_value(s_compact_fc, "WAITING", COL_DOWN);
+    }
+
+    bridge_client_t owner = bridge_client_owner();
+    if (owner == BRIDGE_CLIENT_TCP) {
+        set_value(s_compact_client, "TCP", COL_UP);
+    } else if (owner == BRIDGE_CLIENT_WS) {
+        set_value(s_compact_client, ws_serial_is_secure() ? "WSS" : "WS", COL_UP);
+    } else {
+        set_value(s_compact_client, "NONE", COL_DOWN);
+    }
+
+    uint32_t voltage_mv = adc_voltage_get_mv();
+    if (voltage_mv > 0) {
+        uint32_t voltage_centi_v = (voltage_mv + 5) / 10;
+        snprintf(buf, sizeof(buf), "%lu.%02luV",
+                 (unsigned long)(voltage_centi_v / 100),
+                 (unsigned long)(voltage_centi_v % 100));
+        set_value(s_compact_voltage, buf, COL_MONO);
+    } else {
+        set_value(s_compact_voltage, "--.--V", COL_DOWN);
+    }
+
+    wifi_status_t w;
+    wifi_sta_status(&w);
+
+    if (w.ap_active) {
+        set_value(s_compact_status, "SETUP", COL_WARN);
+        lv_obj_set_style_bg_color(s_compact_status, lv_color_hex(0x5A4300), 0);
+    } else if (w.state == WIFI_STA_CONNECTED) {
+        set_value(s_compact_status, "ONLINE", COL_UP);
+        lv_obj_set_style_bg_color(s_compact_status, lv_color_hex(0x164B2A), 0);
+    } else {
+        set_value(s_compact_status, "OFFLINE", COL_DOWN);
+        lv_obj_set_style_bg_color(s_compact_status, lv_color_hex(0x2A2E34), 0);
+    }
+
+    if (w.state == WIFI_STA_CONNECTED) {
+        set_value(s_compact_wifi, w.ssid, COL_UP);
+    } else if (w.state == WIFI_STA_CONNECTING) {
+        set_value(s_compact_wifi, "CONNECTING", COL_WARN);
+    } else if (w.ap_active) {
+        set_value(s_compact_wifi, "SETUP AP", COL_WARN);
+    } else {
+        set_value(s_compact_wifi, "OFFLINE", COL_DOWN);
+    }
+
+    if (w.state == WIFI_STA_CONNECTED && w.ip[0]) {
+        lv_label_set_text(s_compact_address_key, "PORT");
+        snprintf(buf, sizeof(buf), "tcp://%s:%d", w.ip, TCP_SERVER_PORT);
+        set_value(s_compact_address[0], buf, COL_MONO);
+        snprintf(buf, sizeof(buf), "ws://%s/serial", w.ip);
+        set_value(s_compact_address[1], buf, COL_MONO);
+        snprintf(buf, sizeof(buf), "wss://%s/serial", w.ip);
+        set_value(s_compact_address[2], buf, COL_MONO);
+
+        snprintf(buf, sizeof(buf), "http://%s/", w.ip);
+        if (strcmp(s_compact_qr_url, buf) != 0) {
+            strlcpy(s_compact_qr_url, buf, sizeof(s_compact_qr_url));
+            lv_qrcode_set_data(s_compact_qr, s_compact_qr_url);
+        }
+        lv_label_set_text(s_compact_qr_hint, "scan to monitor");
+        lv_obj_clear_flag(s_compact_qr, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(s_compact_qr_hint, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        if (w.ap_active) {
+            lv_label_set_text(s_compact_address_key, "IP");
+            set_value(s_compact_address[0], WIFI_AP_IP, COL_MONO);
+
+            snprintf(buf, sizeof(buf), "http://%s/", WIFI_AP_IP);
+            if (strcmp(s_compact_qr_url, buf) != 0) {
+                strlcpy(s_compact_qr_url, buf, sizeof(s_compact_qr_url));
+                lv_qrcode_set_data(s_compact_qr, s_compact_qr_url);
+            }
+            lv_label_set_text(s_compact_qr_hint, "scan to setup");
+            lv_obj_clear_flag(s_compact_qr, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(s_compact_qr_hint, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_label_set_text(s_compact_address_key, "IP");
+            set_value(s_compact_address[0], "-", COL_DOWN);
+            s_compact_qr_url[0] = '\0';
+            lv_obj_add_flag(s_compact_qr, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(s_compact_qr_hint, LV_OBJ_FLAG_HIDDEN);
+        }
+        set_value(s_compact_address[1], "", COL_DOWN);
+        set_value(s_compact_address[2], "", COL_DOWN);
+    }
+}
+
+static void build_hglrc_ui(void)
+{
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
+    lv_obj_set_style_pad_all(screen, 0, 0);
+
+    lv_obj_t *header = lv_obj_create(screen);
+    lv_obj_set_pos(header, 0, 0);
+    lv_obj_set_size(header, 320, 35);
+    lv_obj_set_style_bg_color(header, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_side(header, LV_BORDER_SIDE_BOTTOM, 0);
+    lv_obj_set_style_border_color(header, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_border_width(header, 2, 0);
+    lv_obj_set_style_pad_all(header, 0, 0);
+    lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *logo = lv_image_create(header);
+    lv_image_set_src(logo, &hglrc_logo);
+    lv_obj_set_style_image_recolor(logo, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_image_recolor_opa(logo, LV_OPA_COVER, 0);
+    lv_obj_set_pos(logo, 10, 8);
+
+    lv_obj_t *title = lv_label_create(header);
+    lv_label_set_text(title, "USB BRIDGE");
+    lv_obj_set_size(title, 85, 20);
+    lv_obj_set_pos(title, 91, 8);
+    lv_label_set_long_mode(title, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(title, &ui_font_size14, 0);
+    lv_obj_set_style_text_color(title, lv_color_hex(COL_TEXT), 0);
+
+    s_compact_voltage = lv_label_create(header);
+    lv_label_set_text(s_compact_voltage, "--.--V");
+    lv_obj_set_size(s_compact_voltage, 80, 20);
+    lv_obj_set_pos(s_compact_voltage, 176, 4);
+    lv_obj_set_style_text_font(s_compact_voltage, &ui_font_size24, 0);
+    lv_label_set_long_mode(s_compact_voltage, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_compact_voltage, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(s_compact_voltage, lv_color_hex(COL_DOWN), 0);
+
+    s_compact_status = lv_label_create(header);
+    lv_label_set_text(s_compact_status, "OFFLINE");
+    lv_obj_set_size(s_compact_status, 58, 20);
+    lv_obj_set_pos(s_compact_status, 258, 7);
+    lv_obj_set_style_text_font(s_compact_status, &ui_font_size14, 0);
+    lv_obj_set_style_text_align(s_compact_status, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(s_compact_status, lv_color_hex(COL_DOWN), 0);
+    lv_obj_set_style_bg_color(s_compact_status, lv_color_hex(0x2A2E34), 0);
+    lv_obj_set_style_radius(s_compact_status, 10, 0);
+    lv_obj_set_style_pad_top(s_compact_status, 3, 0);
+
+    compact_card(screen, 8, 42, 180, 122);
+    compact_card(screen, 198, 42, 114, 122);
+
+    s_compact_fc = compact_value(screen, "FC", 48);
+    s_compact_client = compact_value(screen, "CLIENT", 67);
+    s_compact_wifi = compact_value(screen, "WIFI", 86);
+    s_compact_address[0] = compact_value(screen, "IP", 105);
+    lv_obj_set_pos(s_compact_address_key, 10, 105);
+    lv_obj_set_size(s_compact_address_key, 62, 48);
+    lv_obj_set_pos(s_compact_address[0], 76, 105);
+    lv_obj_set_size(s_compact_address[0], 108, 16);
+    lv_label_set_long_mode(s_compact_address[0], LV_LABEL_LONG_SCROLL_CIRCULAR);
+    s_compact_address[1] = compact_address_value(screen, 121);
+    s_compact_address[2] = compact_address_value(screen, 137);
+    lv_label_set_long_mode(s_compact_wifi, LV_LABEL_LONG_SCROLL_CIRCULAR);
+
+    s_compact_qr = lv_qrcode_create(screen);
+    lv_qrcode_set_size(s_compact_qr, 84);
+    lv_qrcode_set_dark_color(s_compact_qr, lv_color_black());
+    lv_qrcode_set_light_color(s_compact_qr, lv_color_white());
+    lv_qrcode_set_quiet_zone(s_compact_qr, false);
+    lv_obj_set_pos(s_compact_qr, 213, 48);
+    lv_obj_add_flag(s_compact_qr, LV_OBJ_FLAG_HIDDEN);
+
+    s_compact_qr_hint = lv_label_create(screen);
+    lv_label_set_text(s_compact_qr_hint, "scan to setup");
+    lv_obj_set_pos(s_compact_qr_hint, 204, 139);
+    lv_obj_set_size(s_compact_qr_hint, 102, 18);
+    lv_obj_set_style_text_font(s_compact_qr_hint, &ui_font_size14, 0);
+    lv_obj_set_style_text_align(s_compact_qr_hint, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(s_compact_qr_hint, lv_color_hex(COL_KEY), 0);
+    lv_obj_add_flag(s_compact_qr_hint, LV_OBJ_FLAG_HIDDEN);
+
+    lv_timer_create(compact_refresh_cb, REFRESH_MS, NULL);
+    compact_refresh_cb(NULL);
+}
+
+void display_start(void)
+{
+    if (bsp_display_start() == NULL) {
+        ESP_LOGE(TAG, "display init failed");
+        return;
+    }
+
+    bsp_display_lock(0);
+    build_hglrc_ui();
+    bsp_display_unlock();
+
+    vTaskDelay(pdMS_TO_TICKS(200));
     bsp_display_backlight_on();
     ESP_LOGI(TAG, "display ready");
 }

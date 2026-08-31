@@ -1,0 +1,26 @@
+# HGLRC ESP32-S3 development board: 4 MB flash, no PSRAM and a 172x320
+# ST7789 LCD.
+
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/esp32s3-hglrc-a1/partitions.csv"
+
+# Keep USB and WiFi forwarding responsive under load.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# The native USB-Serial-JTAG console drops once USB host mode engages.
+# Use UART0 on the header when a persistent log console is required.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Board identity baked into the image and checked on OTA.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="esp32s3-hglrc-a1"
+
+# Native LVGL text display on the directly connected ST7789 panel.
+CONFIG_BRIDGE_HGLRC_DISPLAY=y
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_12=y
+CONFIG_LV_FONT_MONTSERRAT_10=y
+CONFIG_LV_USE_QRCODE=y

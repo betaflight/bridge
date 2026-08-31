@@ -43,6 +43,10 @@
 #include "leds.h"
 #include "display.h"
 
+#if CONFIG_BRIDGE_HGLRC_DISPLAY
+#include "adc_voltage.h"
+#endif
+
 static const char *TAG = "main";
 
 void app_main(void)
@@ -54,6 +58,13 @@ void app_main(void)
         err = nvs_flash_init();
     }
     ESP_ERROR_CHECK(err);
+
+#if CONFIG_BRIDGE_HGLRC_DISPLAY
+    esp_err_t adc_err = adc_voltage_init();
+    if (adc_err != ESP_OK) {
+        ESP_LOGW(TAG, "voltage monitor disabled: %s", esp_err_to_name(adc_err));
+    }
+#endif
 
     bridge_init();
     wifi_start();

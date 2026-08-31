@@ -32,6 +32,17 @@ set(EXTRA_COMPONENT_DIRS "src")
 
 project(betaflight-bridge)
 
+# GCC 14.2 crashes in register allocation when compiling esp_lcd_panel_rgb.c
+# with debug optimization. Keep this IDF component unoptimized as a workaround
+# when the selected target actually includes esp_lcd.
+idf_build_get_property(_components BUILD_COMPONENTS)
+if("esp_lcd" IN_LIST _components)
+    idf_component_get_property(_esp_lcd_lib esp_lcd COMPONENT_LIB)
+    if(_esp_lcd_lib)
+        target_compile_options(${_esp_lcd_lib} PRIVATE -O0)
+    endif()
+endif()
+
 # The Waveshare BSPs use memcpy without including <string.h>; force the
 # include rather than patching the fetched component.
 idf_build_get_property(_components BUILD_COMPONENTS)
