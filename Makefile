@@ -43,7 +43,7 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make esp_tools build/update the ESP-IDF submodule and toolchain"
-	@echo "  make <board>   build the flash/OTA image for <board>"
+	@echo "  make <board>   build the OTA and factory images for <board>"
 	@echo "  make clean     remove build artefacts"
 	@echo "  make help      show this message"
 	@echo ""
@@ -56,7 +56,9 @@ help:
 	  fi; \
 	done
 	@echo ""
-	@echo "The build image is written to dist/$(PROJECT)-<board>.bin"
+	@echo "Each build writes two images to dist/:"
+	@echo "  $(PROJECT)-<board>.bin          app only, for OTA (0x20000)"
+	@echo "  $(PROJECT)-<board>-factory.bin  whole flash, for a first flash (0x0)"
 
 # Bare board names (machine-readable, one per line) for scripting/CI.
 list:
@@ -86,6 +88,11 @@ esp_tools:
 VERSION_FILENAME := $(subst /,-,$(VERSION))
 $(BOARDS): IMG = $(PROJECT)-$@$(if $(VERSION_FILENAME),-$(VERSION_FILENAME))
 
+# Each build also emits <IMG>-factory.bin: bootloader + partition table + blank
+# otadata/NVS + app merged into one blob flashed at 0x0, so a stock board can be
+# flashed from a browser with no toolchain. Offsets and flash mode/freq/size come
+# from the build's own flash args file, so they always match the board.
+
 $(BOARDS):
 	@echo "==> Building $(PROJECT) for board: $@"
 	@set -e; \
@@ -106,10 +113,18 @@ $(BOARDS):
 	idf.py -DBOARD=$@ $(if $(VERSION),-DBRIDGE_VERSION=$(VERSION),) build; \
 	mkdir -p dist; \
 	cp build/$(PROJECT).bin dist/$(IMG).bin; \
+	args=$$(ls build/flash_args build/flash_project_args 2>/dev/null | head -1); \
+	if [ -z "$$args" ]; then echo "no flash args in build/; cannot merge"; exit 1; fi; \
+	( cd build && esptool.py --chip $(IDF_TARGET) merge_bin \
+	    -o ../dist/$(IMG)-factory.bin @$${args#build/} ); \
 	echo "$@" > $(LAST_BOARD); \
 	echo ""; \
-	echo "==> Done. Flash/OTA image: dist/$(IMG).bin"; \
+	echo "==> Done."; \
+	echo "    OTA image:     dist/$(IMG).bin (app only, 0x20000)"; \
+	echo "    Factory image: dist/$(IMG)-factory.bin (whole flash, 0x0)"; \
+	echo ""; \
 	echo "    Serial flash:  idf.py -DBOARD=$@ -p <PORT> flash monitor"; \
+	echo "    Browser flash: esptool-js, factory image at offset 0x0"; \
 	echo "    OTA:           upload dist/$(IMG).bin from the web UI"
 
 clean:
