@@ -158,9 +158,22 @@ make esp32s3-wroom-freenove # build the image for a board
 make clean                  # remove build/, dist/ and sdkconfig
 ```
 
-Each build writes `dist/betaflight-bridge-<board>.bin` — the image used for both
-serial flashing and OTA. Switching boards triggers a clean reconfigure, so you
-don't need to delete `sdkconfig` by hand.
+Each build writes two images to `dist/`. Switching boards triggers a clean
+reconfigure, so you don't need to delete `sdkconfig` by hand.
+
+| File | Offset | Use |
+|------|--------|-----|
+| `betaflight-bridge-<board>[-<version>].bin` | `0x20000` | OTA update from the web UI |
+| `betaflight-bridge-<board>[-<version>]-factory.bin` | `0x0` | first flash of a stock board |
+
+The factory image is the app plus the bootloader, partition table and a blank
+otadata/NVS, merged into one blob — everything a bare board needs. The plain
+image is the app alone, which is what the OTA endpoint expects.
+
+The `-<version>` suffix is the `BRIDGE_VERSION` in `src/main/version.h`, so a
+plain `make <board>` already stamps it. Override it with `make <board>
+VERSION=x.y.z` — the release workflow passes the tag. Examples below use
+`2026.6.0` in place of the version.
 
 To flash and monitor over serial, use `idf.py` directly:
 
@@ -171,6 +184,42 @@ idf.py -DBOARD=esp32s3-wroom-freenove -p /dev/ttyACM0 flash monitor
 On the dual-USB Freenove, flash/monitor over the CH343 UART port — it stays
 connected even after the firmware switches the native USB into host mode. On the
 single-port ZERO the console drops once host mode engages.
+
+## First flash from a browser
+
+The factory image needs no toolchain and no clone — download
+`betaflight-bridge-<board>-<version>-factory.bin` for your board from the
+[releases page](../../releases) and flash it at offset `0x0`:
+
+1. Open <https://espressif.github.io/esptool-js/> in a browser that supports Web
+   Serial — Chrome/Edge 89+, Opera 76+, Firefox 151+, or Chrome on Android 152+.
+   Safari does not support it.
+2. **Connect**, and pick the board's port.
+3. Set the offset to `0x0`, choose the factory `.bin`, then **Program**.
+
+Or, with esptool installed locally:
+
+```sh
+esptool.py --chip esp32s3 write_flash 0x0 \
+    betaflight-bridge-esp32s3-wroom-freenove-2026.6.0-factory.bin
+```
+
+Afterwards the board is updated over WiFi — see [Updating](#updating-ota).
+
+**Pick the image matching your board.** All three boards are ESP32-S3, so a
+flasher cannot tell them apart, but the flash sizes (4/8/16 MB) and partition
+tables are not interchangeable. A mismatched image may fail to boot — hold
+**BOOT** while resetting to get back into download mode and re-flash.
+
+**A factory flash wipes stored settings.** The saved WiFi credentials and the
+self-signed TLS certificate both live in NVS, which the merged image blanks. The
+board comes back up in SoftAP mode as if new, and the browser certificate
+exception has to be accepted again (see [Connecting](#connecting)).
+
+To get a port the flasher can see, hold **BOOT** while resetting the board. On
+the single-port ZERO and Touch-LCD-4B this is required once the firmware has
+switched the native USB into host mode; on the Freenove use the CH343 UART port,
+which is always available.
 
 ## Connecting
 
@@ -234,10 +283,13 @@ the bridge's IP changes or the certificate is cleared (e.g. an NVS erase).
 
 ## Updating (OTA)
 
-After the first serial flash, firmware is updated over WiFi — no cable. On the
-web page use **Firmware update**: pick the `dist/betaflight-bridge-<board>.bin`
-built for this board and hit *Upload & reboot*. The image streams into the spare OTA slot, the boot partition
-is switched, and the board restarts (~10 s); reconnect to the page afterwards.
+After the first flash, firmware is updated over WiFi — no cable. On the web page
+use **Firmware update**: pick the plain
+`betaflight-bridge-<board>-<version>.bin` built for this board — *not* the
+`-factory.bin`, which is a whole-flash image and is rejected — and hit
+*Upload & reboot*. The image streams into the spare OTA slot,
+the boot partition is switched, and the board restarts (~10 s); reconnect to the
+page afterwards.
 
 The layout is dual-OTA (`ota_0`/`ota_1`) with rollback enabled: a freshly
 uploaded image boots in *pending-verify* state and only sticks once it comes up
@@ -250,8 +302,9 @@ therefore checked on upload: an image for another board is rejected with a 400
 and the boot partition is left untouched. The running board and slot are shown
 on the status page.
 
-> The dual-OTA partition table only takes effect from a **serial** flash, so the
-> initial `idf.py ... flash` is the last one that needs the cable.
+> The partition table only takes effect from a flash over the wire, so the first
+> flash — `idf.py flash` or the factory image from a browser — is the last one
+> that needs the cable.
 
 ## Notes
 
