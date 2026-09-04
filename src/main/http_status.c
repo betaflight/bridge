@@ -176,6 +176,8 @@ static const char PAGE[] =
     "function reboot(){if(!confirm('Restart the bridge?'))return;$('ctl').textContent='Restarting — back in ~10s.';"
     "fetch('/reboot',{method:'POST'}).catch(function(){});setTimeout(function(){location.reload()},12000)}"
     "function upload(){var f=$('fw').files[0];if(!f){$('up').textContent='Pick a .bin file.';return}"
+    // The factory image is a whole-flash blob; OTA takes the app-only .bin.
+    "if(/-factory\\.bin$/i.test(f.name)){$('up').textContent='That is the factory image — use the plain .bin for OTA.';return}"
     "var x=new XMLHttpRequest();x.open('POST','/update');"
     "x.upload.onprogress=function(e){if(e.lengthComputable)$('up').textContent='Uploading '+Math.round(e.loaded/e.total*100)+'%…'};"
     "x.onload=function(){$('up').textContent=x.status==200?'Update OK — rebooting, reconnect in ~10s.':'Update failed: '+x.responseText};"
