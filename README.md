@@ -163,12 +163,17 @@ reconfigure, so you don't need to delete `sdkconfig` by hand.
 
 | File | Offset | Use |
 |------|--------|-----|
-| `betaflight-bridge-<board>.bin` | `0x20000` | OTA update from the web UI |
-| `betaflight-bridge-<board>-factory.bin` | `0x0` | first flash of a stock board |
+| `betaflight-bridge-<board>[-<version>].bin` | `0x20000` | OTA update from the web UI |
+| `betaflight-bridge-<board>[-<version>]-factory.bin` | `0x0` | first flash of a stock board |
 
 The factory image is the app plus the bootloader, partition table and a blank
 otadata/NVS, merged into one blob — everything a bare board needs. The plain
 image is the app alone, which is what the OTA endpoint expects.
+
+The `-<version>` suffix is the `BRIDGE_VERSION` in `src/main/version.h`, so a
+plain `make <board>` already stamps it. Override it with `make <board>
+VERSION=x.y.z` — the release workflow passes the tag. Examples below use
+`2026.6.0` in place of the version.
 
 To flash and monitor over serial, use `idf.py` directly:
 
@@ -183,7 +188,7 @@ single-port ZERO the console drops once host mode engages.
 ## First flash from a browser
 
 The factory image needs no toolchain and no clone — download
-`betaflight-bridge-<board>-factory.bin` for your board from the
+`betaflight-bridge-<board>-<version>-factory.bin` for your board from the
 [releases page](../../releases) and flash it at offset `0x0`:
 
 1. Open <https://espressif.github.io/esptool-js/> in a browser that supports Web
@@ -195,7 +200,8 @@ The factory image needs no toolchain and no clone — download
 Or, with esptool installed locally:
 
 ```sh
-esptool.py --chip esp32s3 write_flash 0x0 betaflight-bridge-<board>-factory.bin
+esptool.py --chip esp32s3 write_flash 0x0 \
+    betaflight-bridge-esp32s3-wroom-freenove-2026.6.0-factory.bin
 ```
 
 Afterwards the board is updated over WiFi — see [Updating](#updating-ota).
@@ -278,9 +284,10 @@ the bridge's IP changes or the certificate is cleared (e.g. an NVS erase).
 ## Updating (OTA)
 
 After the first flash, firmware is updated over WiFi — no cable. On the web page
-use **Firmware update**: pick the plain `betaflight-bridge-<board>.bin` built for
-this board — *not* the `-factory.bin`, which is a whole-flash image and is
-rejected — and hit *Upload & reboot*. The image streams into the spare OTA slot,
+use **Firmware update**: pick the plain
+`betaflight-bridge-<board>-<version>.bin` built for this board — *not* the
+`-factory.bin`, which is a whole-flash image and is rejected — and hit
+*Upload & reboot*. The image streams into the spare OTA slot,
 the boot partition is switched, and the board restarts (~10 s); reconnect to the
 page afterwards.
 
