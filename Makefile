@@ -56,9 +56,9 @@ help:
 	  fi; \
 	done
 	@echo ""
-	@echo "Each build writes two images to dist/:"
-	@echo "  $(PROJECT)-<board>.bin          app only, for OTA (0x20000)"
-	@echo "  $(PROJECT)-<board>-factory.bin  whole flash, for a first flash (0x0)"
+	@echo "Each build writes two images to dist/ (-<version> from VERSION):"
+	@echo "  $(PROJECT)-<board>[-<version>].bin          app only, for OTA (0x20000)"
+	@echo "  $(PROJECT)-<board>[-<version>]-factory.bin  whole flash, first flash (0x0)"
 
 # Bare board names (machine-readable, one per line) for scripting/CI.
 list:
