@@ -186,8 +186,9 @@ The factory image needs no toolchain and no clone — download
 `betaflight-bridge-<board>-factory.bin` for your board from the
 [releases page](../../releases) and flash it at offset `0x0`:
 
-1. Open <https://espressif.github.io/esptool-js/> in Chrome or Edge (Web Serial
-   is not available in Firefox or Safari).
+1. Open <https://espressif.github.io/esptool-js/> in a browser that supports Web
+   Serial — Chrome/Edge 89+, Opera 76+, Firefox 151+, or Chrome on Android 152+.
+   Safari does not support it.
 2. **Connect**, and pick the board's port.
 3. Set the offset to `0x0`, choose the factory `.bin`, then **Program**.
 
