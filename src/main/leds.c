@@ -74,11 +74,12 @@ static void led_task(void *arg)
 #endif
 
     for (;;) {
+        wifi_status_t w;
+        wifi_sta_status(&w);
+
 #if defined(BOARD_WIFI_LED_GPIO)
         // Blink cadence encodes WiFi state: solid = connected as station,
         // fast = associating, slow = AP setup mode / idle.
-        wifi_status_t w;
-        wifi_sta_status(&w);
         int on;
         if (w.state == WIFI_STA_CONNECTED) {
             on = 1;                                  // solid
@@ -91,7 +92,9 @@ static void led_task(void *arg)
 #endif
 
 #if defined(BOARD_RGB_LED_GPIO)
-        // NeoPixel encodes the FC link on the OTG port:
+        // NeoPixel doubles as the WiFi status indicator while the station is
+        // down and retrying: a steady blue flash, overriding the FC-link
+        // colours. Otherwise it encodes the FC link on the OTG port:
         //   dim red   - no FC attached
         //   amber     - FC VCP open, idle
         //   green     - FC + Configurator (TCP) linked
@@ -101,7 +104,14 @@ static void led_task(void *arg)
         bool traffic = (activity != last_activity);
         last_activity = activity;
 
-        if (!usb) {
+        bool wifi_retrying = w.state == WIFI_STA_CONNECTING || w.state == WIFI_STA_FAILED;
+        if (wifi_retrying) {
+            if ((tick / 4) & 1) {                    // ~2.5 Hz
+                rgb_set(0, 0, 40);
+            } else {
+                rgb_set(0, 0, 0);
+            }
+        } else if (!usb) {
             rgb_set(8, 0, 0);
         } else if (traffic) {
             rgb_set(0, 0, 40);
