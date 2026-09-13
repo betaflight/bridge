@@ -69,12 +69,15 @@ static inline void unlock(void) { xSemaphoreGive(s_lock); }
 // rejoined when it returns instead of being abandoned.
 static void retry_timer_cb(void *arg)
 {
+    // Hold the lock through the connect: esp_timer_stop() does not wait for a
+    // running callback, so a concurrent credential clear (wifi_set_station)
+    // could otherwise interleave here and resurrect the forgotten network.
+    // esp_wifi_connect() only posts to the WiFi task, so no deadlock.
     lock();
-    bool connect = s_sta_configured && s_sta_state != WIFI_STA_CONNECTED;
-    unlock();
-    if (connect) {
+    if (s_sta_configured && s_sta_state != WIFI_STA_CONNECTED) {
         esp_wifi_connect();
     }
+    unlock();
 }
 
 static void schedule_retry(void)
@@ -174,6 +177,13 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
         lock();
+        if (!s_sta_configured) {
+            // Credentials were cleared while this attempt was in flight;
+            // don't accept the stale connection.
+            unlock();
+            esp_wifi_disconnect();
+            return;
+        }
         s_sta_retries = 0;
         s_ever_connected = true;
         s_sta_state = WIFI_STA_CONNECTED;
@@ -369,6 +379,10 @@ void wifi_set_station(const char *ssid, const char *pass)
         s_sta_ssid[0] = s_sta_ip[0] = s_sta_gw[0] = s_sta_netmask[0] = '\0';
         unlock();
         esp_timer_stop(s_retry_timer);
+        // Wipe the driver's copy of the credentials so a stray reconnect has
+        // nothing left to join.
+        wifi_config_t sta = {0};
+        esp_wifi_set_config(WIFI_IF_STA, &sta);
         esp_wifi_disconnect();
         ensure_ap();
         ESP_LOGI(TAG, "station creds cleared; AP available for setup");
