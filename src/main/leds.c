@@ -93,8 +93,8 @@ static void led_task(void *arg)
 
 #if defined(BOARD_RGB_LED_GPIO)
         // NeoPixel doubles as the WiFi status indicator while the station is
-        // down and retrying: a steady blue flash, overriding the FC-link
-        // colours. Otherwise it encodes the FC link on the OTG port:
+        // down and retrying: blue pulses interleaved with the FC-link colours.
+        // Otherwise it encodes the FC link on the OTG port:
         //   dim red   - no FC attached
         //   amber     - FC VCP open, idle
         //   green     - FC + Configurator (TCP) linked
@@ -105,12 +105,8 @@ static void led_task(void *arg)
         last_activity = activity;
 
         bool wifi_retrying = w.state == WIFI_STA_CONNECTING || w.state == WIFI_STA_FAILED;
-        if (wifi_retrying) {
-            if ((tick / 4) & 1) {                    // ~2.5 Hz
-                rgb_set(0, 0, 40);
-            } else {
-                rgb_set(0, 0, 0);
-            }
+        if (wifi_retrying && ((tick / 4) & 1)) {     // ~2.5 Hz, FC colours between pulses
+            rgb_set(0, 0, 40);
         } else if (!usb) {
             rgb_set(8, 0, 0);
         } else if (traffic) {
