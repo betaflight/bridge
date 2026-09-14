@@ -136,7 +136,7 @@ static const char PAGE[] =
     "var w=s.wifi,h;"
     "if(w.state=='connected')h='<span class=\\\"up\\\">'+w.ssid+'</span>';"
     "else if(w.state=='connecting')h='<span class=\\\"warn\\\">connecting to '+w.ssid+'…</span>';"
-    "else if(w.state=='failed')h='<span class=\\\"warn\\\">failed: '+w.ssid+'</span>';"
+    "else if(w.state=='failed')h='<span class=\\\"warn\\\">retrying '+w.ssid+'</span>';"
     "else h='<span class=\\\"down\\\">none</span>';"
     "$('sta').innerHTML=h;"
     "var rs=w.rssi;"

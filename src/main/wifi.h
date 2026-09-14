@@ -54,7 +54,7 @@ typedef enum {
     WIFI_STA_IDLE = 0,    // no credentials configured
     WIFI_STA_CONNECTING,  // associating / waiting for an IP
     WIFI_STA_CONNECTED,   // associated and has an IP
-    WIFI_STA_FAILED,      // gave up after retries
+    WIFI_STA_FAILED,      // never reached; AP raised, still retrying in the background
 } wifi_sta_state_t;
 
 typedef struct {

@@ -31,6 +31,7 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "lwip/inet.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -39,6 +40,7 @@ static const char *TAG = "wifi";
 
 #define NVS_NAMESPACE   "wifi"
 #define STA_MAX_RETRY   5
+#define STA_RETRY_INTERVAL_MS  10000
 
 static esp_netif_t *s_ap_netif;
 static esp_netif_t *s_sta_netif;
@@ -57,8 +59,32 @@ static char              s_sta_ip[16];       // assigned IP when connected
 static char              s_sta_gw[16];       // gateway when connected
 static char              s_sta_netmask[16];  // netmask when connected
 
+static esp_timer_handle_t s_retry_timer;
+
 static inline void lock(void)   { xSemaphoreTake(s_lock, portMAX_DELAY); }
 static inline void unlock(void) { xSemaphoreGive(s_lock); }
+
+// Paced background reconnect once the immediate retry burst is exhausted, so
+// a network that is down for minutes (router rebooting after a power blip) is
+// rejoined when it returns instead of being abandoned.
+static void retry_timer_cb(void *arg)
+{
+    // Hold the lock through the connect: esp_timer_stop() does not wait for a
+    // running callback, so a concurrent credential clear (wifi_set_station)
+    // could otherwise interleave here and resurrect the forgotten network.
+    // esp_wifi_connect() only posts to the WiFi task, so no deadlock.
+    lock();
+    if (s_sta_configured && s_sta_state != WIFI_STA_CONNECTED) {
+        esp_wifi_connect();
+    }
+    unlock();
+}
+
+static void schedule_retry(void)
+{
+    esp_timer_stop(s_retry_timer);   // no-op when not armed
+    esp_timer_start_once(s_retry_timer, STA_RETRY_INTERVAL_MS * 1000ULL);
+}
 
 static void start_ap(void);
 static void configure_ap_dhcp(esp_netif_t *ap);
@@ -101,7 +127,7 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
             break;
         case WIFI_EVENT_STA_DISCONNECTED: {
             // Decide under the lock, act after releasing it.
-            enum { RETRY, KEEP_TRYING, FALLBACK_AP, STOP } action;
+            enum { RETRY, RETRY_LATER, FALLBACK_AP, STOP } action;
             lock();
             if (!s_sta_configured) {
                 s_sta_state = WIFI_STA_IDLE;
@@ -109,17 +135,19 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
             } else if (s_sta_retries++ < STA_MAX_RETRY) {
                 s_sta_state = WIFI_STA_CONNECTING;
                 action = RETRY;
-            } else if (s_ever_connected) {
-                // Known network briefly dropped: keep trying, don't raise the AP.
-                s_sta_retries = 0;
-                s_sta_state = WIFI_STA_CONNECTING;
-                s_sta_ip[0] = s_sta_gw[0] = s_sta_netmask[0] = '\0';
-                action = KEEP_TRYING;
             } else {
-                // Never reached this network: bring up the AP so it can be fixed.
-                s_sta_state = WIFI_STA_FAILED;
+                // Immediate retries exhausted: fall back to a slow cadence and
+                // never give up. If this network has never been reached this
+                // boot, also raise the AP so the device can be reconfigured.
+                s_sta_retries = 0;
                 s_sta_ip[0] = s_sta_gw[0] = s_sta_netmask[0] = '\0';
-                action = FALLBACK_AP;
+                if (s_ever_connected) {
+                    s_sta_state = WIFI_STA_CONNECTING;
+                    action = RETRY_LATER;
+                } else {
+                    s_sta_state = WIFI_STA_FAILED;
+                    action = FALLBACK_AP;
+                }
             }
             unlock();
 
@@ -128,12 +156,12 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
                 ESP_LOGW(TAG, "STA disconnected, retry %d", s_sta_retries);
                 esp_wifi_connect();
                 break;
-            case KEEP_TRYING:
-                esp_wifi_connect();
-                break;
             case FALLBACK_AP:
-                ESP_LOGW(TAG, "network '%s' unreachable; enabling AP for setup", s_sta_ssid);
+                ESP_LOGW(TAG, "network '%s' unreachable; enabling AP, still retrying", s_sta_ssid);
                 ensure_ap();
+                // fall through
+            case RETRY_LATER:
+                schedule_retry();
                 break;
             case STOP:
                 break;
@@ -149,6 +177,13 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
         lock();
+        if (!s_sta_configured) {
+            // Credentials were cleared while this attempt was in flight;
+            // don't accept the stale connection.
+            unlock();
+            esp_wifi_disconnect();
+            return;
+        }
         s_sta_retries = 0;
         s_ever_connected = true;
         s_sta_state = WIFI_STA_CONNECTED;
@@ -273,6 +308,12 @@ void wifi_start(void)
 {
     s_lock = xSemaphoreCreateMutex();
 
+    const esp_timer_create_args_t retry_args = {
+        .callback = retry_timer_cb,
+        .name = "wifi_retry",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&retry_args, &s_retry_timer));
+
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -337,6 +378,11 @@ void wifi_set_station(const char *ssid, const char *pass)
         s_sta_state = WIFI_STA_IDLE;
         s_sta_ssid[0] = s_sta_ip[0] = s_sta_gw[0] = s_sta_netmask[0] = '\0';
         unlock();
+        esp_timer_stop(s_retry_timer);
+        // Wipe the driver's copy of the credentials so a stray reconnect has
+        // nothing left to join.
+        wifi_config_t sta = {0};
+        esp_wifi_set_config(WIFI_IF_STA, &sta);
         esp_wifi_disconnect();
         ensure_ap();
         ESP_LOGI(TAG, "station creds cleared; AP available for setup");

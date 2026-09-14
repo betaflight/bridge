@@ -122,7 +122,7 @@ static void refresh_cb(lv_timer_t *timer)
         snprintf(buf, sizeof(buf), "connecting to %s...", w.ssid);
         set_value(s_val_sta, buf, COL_WARN);
     } else if (w.state == WIFI_STA_FAILED) {
-        snprintf(buf, sizeof(buf), "failed: %s", w.ssid);
+        snprintf(buf, sizeof(buf), "retrying %s", w.ssid);
         set_value(s_val_sta, buf, COL_WARN);
     } else {
         set_value(s_val_sta, "none", COL_DOWN);

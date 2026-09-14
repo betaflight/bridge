@@ -29,6 +29,7 @@ idf_component_register(
         mbedtls
         app_update
         esp_app_format
+        esp_timer
         esp_driver_gpio
         esp_driver_i2c
         espressif__mdns
