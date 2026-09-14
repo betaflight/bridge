@@ -418,6 +418,13 @@ static esp_err_t status_get(httpd_req_t *req)
 
     wifi_status_t w;
     wifi_sta_status(&w);
+
+    if(w.ap_active && strlen(w.ip) == 0 ) {
+        strlcpy(w.ip, WIFI_AP_IP, sizeof(w.ip));
+        strlcpy(w.gw, WIFI_AP_IP, sizeof(w.gw));
+        strlcpy(w.netmask, "255.255.255.0", sizeof(w.netmask));
+    }
+
     const char *state = w.state == WIFI_STA_CONNECTED  ? "connected"
                       : w.state == WIFI_STA_CONNECTING ? "connecting"
                       : w.state == WIFI_STA_FAILED     ? "failed" : "idle";
