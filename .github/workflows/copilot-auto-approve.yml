@@ -10,16 +10,30 @@ jobs:
   approve:
     # Copilot posts its verdict as a COMMENTED review headed either "Changes
     # recommended" or "Ready to approve"; only the latter should approve.
+    # commit_id must still be the head: a push racing the review would otherwise
+    # inherit an approval for code Copilot never read.
     if: >-
+      github.event.review.state == 'commented' &&
       github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' &&
+      github.event.review.commit_id == github.event.pull_request.head.sha &&
       contains(github.event.review.body, 'ready to approve')
     runs-on: ubuntu-latest
     steps:
       # GITHUB_TOKEN is not permitted to approve a pull request, so this needs a
-      # separate bot token with pull-requests: write.
+      # separate bot token with pull-requests: write. Fork pull requests are not
+      # served repository secrets, so those are left for a human to approve.
       - name: Approve pull request
         env:
           GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
-        run: gh pr review "$PR" --approve --body "Approving on Copilot's assessment."
+          COMMIT: ${{ github.event.review.commit_id }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "No bot token available (fork pull request?); leaving this one for a human."
+            exit 0
+          fi
+          gh api "repos/$GH_REPO/pulls/$PR/reviews" \
+            -f event=APPROVE \
+            -f commit_id="$COMMIT" \
+            -f body="Approving on Copilot's assessment."
