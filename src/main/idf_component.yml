@@ -16,6 +16,10 @@ dependencies:
   lvgl/lvgl:
     version: "^9.2.0"
     rules:
-      - if: "$CONFIG{BRIDGE_DISPLAY} == True"
+      - if: "$CONFIG{BRIDGE_DISPLAY} == True || $CONFIG{BRIDGE_HGLRC_DISPLAY} == True"
+  espressif/esp_lvgl_port:
+    version: "^2.8.0~1"
+    rules:
+      - if: "$CONFIG{BRIDGE_HGLRC_DISPLAY} == True"
   idf:
     version: ">=5.0"

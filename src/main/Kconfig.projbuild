@@ -10,4 +10,11 @@ menu "Betaflight bridge"
             sdkconfig.defaults; pulls in the board BSP and LVGL managed
             components, which are not fetched when disabled.
 
+    config BRIDGE_HGLRC_DISPLAY
+        bool "HGLRC LVGL status display"
+        default n
+        help
+            Drive the HGLRC board's directly connected ST7789 display using
+            the LVGL 9 display-driver stack.
+
 endmenu
