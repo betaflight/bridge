@@ -22,12 +22,26 @@
 // Firmware version — shown in the web UI tagline and stamped into the build
 // artefact's filename.
 //
-// This default is the single source of truth: the Makefile reads BRIDGE_VERSION
-// from here so an unversioned `make <board>` still stamps and names the image
-// with it. The release workflow overrides it at build time with
-// -DBRIDGE_VERSION=<tag> (see CMakeLists.txt), hence the #ifndef guard.
+// CalVer, as betaflight uses: YEAR.MONTH.PATCH with an optional pre-release
+// suffix, on the bridge's own release clock rather than betaflight's. Bump
+// these, commit, then tag with exactly the resulting string (no "v" prefix);
+// the release workflow refuses to publish when the two disagree. The Makefile
+// reads the same four values to name the image.
 #pragma once
 
-#ifndef BRIDGE_VERSION
-#define BRIDGE_VERSION "2026.6.0-alpha"
-#endif
+#define BRIDGE_VERSION_YEAR   2026
+#define BRIDGE_VERSION_MONTH  6
+// 0 for the initial YEAR.MONTH release, then up for each bug-fix release.
+#define BRIDGE_VERSION_PATCH  0
+// Pre-release marker, written with its leading dash (e.g. "-rc1"). Empty
+// string for a final release.
+#define BRIDGE_VERSION_SUFFIX "-alpha"
+
+#define BRIDGE_VERSION_STR_(x) #x
+#define BRIDGE_VERSION_STR(x)  BRIDGE_VERSION_STR_(x)
+
+#define BRIDGE_VERSION                       \
+    BRIDGE_VERSION_STR(BRIDGE_VERSION_YEAR)  \
+    "." BRIDGE_VERSION_STR(BRIDGE_VERSION_MONTH) \
+    "." BRIDGE_VERSION_STR(BRIDGE_VERSION_PATCH) \
+    BRIDGE_VERSION_SUFFIX
