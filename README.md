@@ -216,7 +216,8 @@ To cut a release:
 3. `.github/workflows/release.yml` picks the tag up. It fails immediately if
    the tag disagrees with `src/main/version.h`, so a mistyped tag never becomes
    a release. Otherwise it builds every board and leaves a **draft** release
-   carrying both images for each, with generated notes.
+   carrying both images for each, with generated notes. A suffixed version is
+   marked as a pre-release automatically; you don't have to tick the box.
 4. Review the draft, then publish it.
 
 Nothing is public until step 4, and the images are attached in one go after

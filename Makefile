@@ -20,9 +20,13 @@ PROJECT := betaflight-bridge
 
 # Firmware version. Single source of truth is the CalVer components in
 # src/main/version.h, joined here exactly as the header joins them so the image
-# filename cannot disagree with the string compiled into the firmware. There is
-# deliberately no override: the release is whatever the committed header says.
-VERSION := $(shell awk \
+# filename cannot disagree with the string compiled into the firmware.
+#
+# `override` on purpose: nothing is passed to the compiler to change the version
+# any more, so honouring `make <board> VERSION=x` would only rename the image
+# while the firmware kept reporting the header value. The release is whatever
+# the committed header says.
+override VERSION := $(shell awk \
 	'/^#define BRIDGE_VERSION_YEAR/   {y=$$3} \
 	 /^#define BRIDGE_VERSION_MONTH/  {m=$$3} \
 	 /^#define BRIDGE_VERSION_PATCH/  {p=$$3} \

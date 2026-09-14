@@ -122,10 +122,25 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           ls -1 dist/
-          if gh release view "$TAG" >/dev/null 2>&1; then
+
+          # A CalVer tag carries a suffix only when it is a pre-release
+          # (2026.6.0-rc1 against 2026.6.1), which is what version.h encodes.
+          extra=()
+          case "$TAG" in
+            *-*) extra+=(--prerelease) ;;
+          esac
+
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            # Re-run over a tag that already shipped: leave it alone. --clobber
+            # would swap the assets out from under a published release, and a
+            # failure part-way would leave it holding an incomplete set.
+            if [ "$draft" != "true" ]; then
+              echo "::error::release $TAG is already published; refusing to touch its assets"
+              exit 1
+            fi
             gh release upload "$TAG" dist/*.bin --clobber
           else
             gh release create "$TAG" dist/*.bin \
-              --draft --generate-notes --title "$TAG"
+              --draft --generate-notes --title "$TAG" "${extra[@]}"
           fi
           echo "Draft ready: review the notes, then publish." >> "$GITHUB_STEP_SUMMARY"
