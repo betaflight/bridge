@@ -1,0 +1,25 @@
+name: Copilot PR auto-approve
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions: {}
+
+jobs:
+  approve:
+    # Copilot posts its verdict as a COMMENTED review headed either "Changes
+    # recommended" or "Ready to approve"; only the latter should approve.
+    if: >-
+      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' &&
+      contains(github.event.review.body, 'ready to approve')
+    runs-on: ubuntu-latest
+    steps:
+      # GITHUB_TOKEN is not permitted to approve a pull request, so this needs a
+      # separate bot token with pull-requests: write.
+      - name: Approve pull request
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr review "$PR" --approve --body "Approving on Copilot's assessment."
