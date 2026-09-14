@@ -8,7 +8,6 @@ reviews:
   poem: false
   review_status: true
   collapse_walkthrough: false
-  disable_placeholder_comment_notifications: true
   auto_review:
     enabled: true
     drafts: false
