@@ -1,21 +1,34 @@
 menu "Betaflight bridge"
 
-    config BRIDGE_DISPLAY_TOUCH
-        bool "Touch status display"
-        default n
+    choice BRIDGE_DISPLAY
+        prompt "Status display"
+        default BRIDGE_DISPLAY_NONE
         help
-            Drive a large on-board LCD with a native LVGL touch UI showing the
-            bridge status (FC link, app client, WiFi, IP) and offering WiFi
-            scan/join. Enabled per-board via the board's sdkconfig.defaults;
-            the panel driver comes from the board's board_display.h.
+            Which on-board display the bridge drives, if any. Selected
+            per-board via the board's sdkconfig.defaults. Both variants reach
+            their panel through the board's board_display.h.
 
-    config BRIDGE_DISPLAY_COMPACT
-        bool "Compact status display"
-        default n
-        help
-            Drive a small on-board LCD with a read-only LVGL status screen:
-            FC link, client, WiFi, connect URLs and a QR code. Alternative to
-            BRIDGE_DISPLAY_TOUCH for boards without a touch panel.
+        config BRIDGE_DISPLAY_NONE
+            bool "None"
+            help
+                No on-board display; display_start() is a no-op.
+
+        config BRIDGE_DISPLAY_TOUCH
+            bool "Touch status display"
+            help
+                Drive a large on-board LCD with a native LVGL touch UI showing
+                the bridge status (FC link, app client, WiFi, IP) and offering
+                WiFi scan/join.
+
+        config BRIDGE_DISPLAY_COMPACT
+            bool "Compact status display"
+            help
+                Drive a small on-board LCD with a read-only LVGL status screen:
+                FC link, client, WiFi, connect URLs and a QR code. The board
+                must also supply the assets display.c expects — see "Adding a
+                board" in the README.
+
+    endchoice
 
     config BRIDGE_ADC_VOLTAGE
         bool "Input voltage monitor"

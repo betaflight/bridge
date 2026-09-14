@@ -152,6 +152,11 @@ Boards with extra hardware may also add:
 - `board_display.h` — declares `bsp_display_start/lock/unlock/backlight_on()`
   for `CONFIG_BRIDGE_DISPLAY_TOUCH` or `CONFIG_BRIDGE_DISPLAY_COMPACT`, either
   by including a vendor BSP header or by declaring a local driver.
+- For `CONFIG_BRIDGE_DISPLAY_COMPACT` only, `display.c` also expects a
+  `board_logo.h` defining an `lv_image_dsc_t board_logo`, and the LVGL fonts
+  `ui_font_size14` and `ui_font_size24`. Register their `.c` files and the
+  directory holding `board_logo.h` in the board's `CMakeLists.txt`; see
+  `boards/esp32s3-hglrc-a1/` for the layout.
 - `idf_component.yml` — managed components only this board needs. Mark a
   dependency `public: true` when `board_display.h` exposes its types.
 - `board.cmake` — build tweaks that can only run once every component is
