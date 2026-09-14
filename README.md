@@ -33,15 +33,17 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 | `src/main/http_status.c` | Web UI on 80 (HTTP) and 443 (HTTPS): status + scan/join + firmware upload + `/serial` |
 | `src/main/ota.c` | `POST /update` OTA handler; streams an uploaded .bin into the spare slot |
 | `src/main/bridge.c` | Two stream buffers decoupling USB and network; single-client arbiter (TCP vs WS) |
-| `boards/<board>/` | Per-board flash size, partition table, PSRAM and identity |
+| `boards/<board>/` | Per-board component: flash size, partition table, PSRAM, identity and any board-specific hardware |
 | `esp-idf/` | Pinned ESP-IDF (git submodule, `release/v5.4`, shallow) |
 
 ## Boards
 
 The board is selected at configure time with `-DBOARD=<name>`, where `<name>` is
-a directory under `boards/`. Each board provides its own `sdkconfig.defaults`
-(flash size, PSRAM, partition CSV) and `board.h` (identity, LED pins), layered
-on the shared top-level `sdkconfig.defaults`. The USB-host pins
+a directory under `boards/`. Only the selected board joins the build, as a
+component of its own, providing `sdkconfig.defaults` (flash size, PSRAM,
+partition CSV) and `board.h` (identity, LED pins), layered on the shared
+top-level `sdkconfig.defaults`. Anything vendor-specific — panel drivers,
+fonts, logos, managed components — stays there. The USB-host pins
 (D- GPIO19 / D+ GPIO20) are fixed on the ESP32-S3 and identical across boards.
 
 | BOARD | Flash | PSRAM | USB | Status LEDs |
@@ -89,8 +91,8 @@ and checked on OTA, so an image built for one board is refused on another (see
   (holds the LCD framebuffer).
 - **Display:** 4.0" 480×480 IPS (ST7701, 16-bit parallel RGB565) with GT911
   capacitive touch, driven by the Waveshare BSP + LVGL
-  (`CONFIG_BRIDGE_DISPLAY`). The screen shows the same status as the web page —
-  FC link, Configurator client, WiFi, IP — and offers on-screen WiFi
+  (`CONFIG_BRIDGE_DISPLAY_TOUCH`). The screen shows the same status as the web
+  page — FC link, Configurator client, WiFi, IP — and offers on-screen WiFi
   scan/join/forget with a touch keyboard.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
@@ -105,7 +107,7 @@ and checked on OTA, so an image built for one board is refused on another (see
 
 - **MCU / memory:** ESP32-S3, 4 MB flash, no PSRAM.
 - **Display:** 1.47" 172x320 IPS ST7789 display driven over SPI with LVGL
-  (`CONFIG_BRIDGE_HGLRC_DISPLAY`). The compact status screen shows the FC and
+  (`CONFIG_BRIDGE_DISPLAY_COMPACT`). The compact status screen shows the FC and
   Configurator links, WiFi state, connection addresses, a QR code for the web
   UI, and the input voltage measured on GPIO12.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
@@ -130,15 +132,30 @@ and checked on OTA, so an image built for one board is refused on another (see
 
 ### Adding a board
 
-Create `boards/<name>/` with three files:
+Create `boards/<name>/` with four files:
 
 - `sdkconfig.defaults` — set `CONFIG_ESPTOOLPY_FLASHSIZE*`,
   `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/<name>/partitions.csv"`, any
-  PSRAM options, and the identity
-  (`CONFIG_APP_PROJECT_VER_FROM_CONFIG=y` + `CONFIG_APP_PROJECT_VER="<name>"`).
+  PSRAM options, the identity (`CONFIG_APP_PROJECT_VER_FROM_CONFIG=y` +
+  `CONFIG_APP_PROJECT_VER="<name>"`) and any `CONFIG_BRIDGE_*` features the
+  board supports.
 - `partitions.csv` — a dual-OTA table sized for the board's flash.
 - `board.h` — `BOARD_NAME` and any LED pins (`BOARD_WIFI_LED_GPIO`,
   `BOARD_RGB_LED_GPIO`); a board may define neither LED.
+- `CMakeLists.txt` — an `idf_component_register(INCLUDE_DIRS ".")` so the
+  directory joins the build as a component. The selected board is the only one
+  added, so anything vendor-specific — panel drivers, fonts, logos, managed
+  components — belongs here rather than in `src/main`.
+
+Boards with extra hardware may also add:
+
+- `board_display.h` — declares `bsp_display_start/lock/unlock/backlight_on()`
+  for `CONFIG_BRIDGE_DISPLAY_TOUCH` or `CONFIG_BRIDGE_DISPLAY_COMPACT`, either
+  by including a vendor BSP header or by declaring a local driver.
+- `idf_component.yml` — managed components only this board needs. Mark a
+  dependency `public: true` when `board_display.h` exposes its types.
+- `board.cmake` — build tweaks that can only run once every component is
+  registered (patching a fetched BSP, say).
 
 Then build with `make <name>` — it is picked up automatically (the board list is
 read from `boards/`) and reconfigures cleanly when you switch boards.

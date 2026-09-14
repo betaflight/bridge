@@ -1,5 +1,9 @@
 #pragma once
 
+// Panel interface for boards that set CONFIG_BRIDGE_DISPLAY_COMPACT. display.c
+// includes this by name only, so the panel behind it stays a board detail —
+// here a directly driven ST7789 (devices/lcd_st7789.c).
+
 #include <stdbool.h>
 #include <stdint.h>
 

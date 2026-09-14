@@ -14,11 +14,11 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-#ifndef LV_ATTRIBUTE_LV_IMG_LOGO_HGLRC_HEADER
-#define LV_ATTRIBUTE_LV_IMG_LOGO_HGLRC_HEADER
+#ifndef LV_ATTRIBUTE_BOARD_LOGO
+#define LV_ATTRIBUTE_BOARD_LOGO
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_LV_IMG_LOGO_HGLRC_HEADER uint8_t lv_img_logo_hglrc_header_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_BOARD_LOGO uint8_t board_logo_map[] = {
 
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xcd, 0xfe, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xfe, 0x02, 0xfe, 0x8c, 0xfe, 0x00, 0x00, 0x00, 0x00,
@@ -223,7 +223,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_LV_IMG
 
 };
 
-const lv_image_dsc_t hglrc_logo = {
+const lv_image_dsc_t board_logo = {
     .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_RGB565A8,
@@ -233,7 +233,7 @@ const lv_image_dsc_t hglrc_logo = {
         .stride = 140,
         .reserved_2 = 0,
     },
-    .data_size = sizeof(lv_img_logo_hglrc_header_map),
-    .data = lv_img_logo_hglrc_header_map,
+    .data_size = sizeof(board_logo_map),
+    .data = board_logo_map,
     .reserved = NULL,
 };

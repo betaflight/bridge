@@ -22,7 +22,7 @@
 #include "display.h"
 #include "sdkconfig.h"
 
-#if CONFIG_BRIDGE_DISPLAY
+#if CONFIG_BRIDGE_DISPLAY_TOUCH
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +32,7 @@
 #include "freertos/semphr.h"
 #include "esp_log.h"
 
-#include "bsp/esp32_s3_touch_lcd_4b.h"
+#include "board_display.h"
 #include "lvgl.h"
 
 #include "wifi.h"
@@ -452,7 +452,7 @@ void display_start(void)
     ESP_LOGI(TAG, "display ready");
 }
 
-#elif CONFIG_BRIDGE_HGLRC_DISPLAY
+#elif CONFIG_BRIDGE_DISPLAY_COMPACT
 
 #include <stdio.h>
 #include <string.h>
@@ -463,9 +463,11 @@ void display_start(void)
 
 #include "lvgl.h"
 
-#include "lcd_st7789.h"
-#include "hglrc_logo.h"
+#include "board_display.h"
+#include "board_logo.h"
+#if CONFIG_BRIDGE_ADC_VOLTAGE
 #include "adc_voltage.h"
+#endif
 #include "wifi.h"
 #include "usb_cdc_host.h"
 #include "tcp_server.h"
@@ -475,7 +477,7 @@ void display_start(void)
 LV_FONT_DECLARE(ui_font_size14);
 LV_FONT_DECLARE(ui_font_size24);
 
-static const char *TAG = "hglrc_display";
+static const char *TAG = "display";
 
 #define COL_BG      0x0f1115
 #define COL_CARD    0x181b20
@@ -496,7 +498,9 @@ static lv_obj_t *s_compact_wifi;
 static lv_obj_t *s_compact_address[3];
 static lv_obj_t *s_compact_address_key;
 static lv_obj_t *s_compact_status;
+#if CONFIG_BRIDGE_ADC_VOLTAGE
 static lv_obj_t *s_compact_voltage;
+#endif
 static lv_obj_t *s_compact_qr;
 static lv_obj_t *s_compact_qr_hint;
 static char s_compact_qr_url[64];
@@ -576,6 +580,7 @@ static void compact_refresh_cb(lv_timer_t *timer)
         set_value(s_compact_client, "NONE", COL_DOWN);
     }
 
+#if CONFIG_BRIDGE_ADC_VOLTAGE
     uint32_t voltage_mv = adc_voltage_get_mv();
     if (voltage_mv > 0) {
         uint32_t voltage_centi_v = (voltage_mv + 5) / 10;
@@ -586,6 +591,7 @@ static void compact_refresh_cb(lv_timer_t *timer)
     } else {
         set_value(s_compact_voltage, "--.--V", COL_DOWN);
     }
+#endif
 
     wifi_status_t w;
     wifi_sta_status(&w);
@@ -653,7 +659,7 @@ static void compact_refresh_cb(lv_timer_t *timer)
     }
 }
 
-static void build_hglrc_ui(void)
+static void build_compact_ui(void)
 {
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
@@ -670,7 +676,7 @@ static void build_hglrc_ui(void)
     lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *logo = lv_image_create(header);
-    lv_image_set_src(logo, &hglrc_logo);
+    lv_image_set_src(logo, &board_logo);
     lv_obj_set_style_image_recolor(logo, lv_color_hex(COL_ACCENT), 0);
     lv_obj_set_style_image_recolor_opa(logo, LV_OPA_COVER, 0);
     lv_obj_set_pos(logo, 10, 8);
@@ -683,6 +689,7 @@ static void build_hglrc_ui(void)
     lv_obj_set_style_text_font(title, &ui_font_size14, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(COL_TEXT), 0);
 
+#if CONFIG_BRIDGE_ADC_VOLTAGE
     s_compact_voltage = lv_label_create(header);
     lv_label_set_text(s_compact_voltage, "--.--V");
     lv_obj_set_size(s_compact_voltage, 80, 20);
@@ -691,6 +698,7 @@ static void build_hglrc_ui(void)
     lv_label_set_long_mode(s_compact_voltage, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_align(s_compact_voltage, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(s_compact_voltage, lv_color_hex(COL_DOWN), 0);
+#endif
 
     s_compact_status = lv_label_create(header);
     lv_label_set_text(s_compact_status, "OFFLINE");
@@ -748,7 +756,7 @@ void display_start(void)
     }
 
     bsp_display_lock(0);
-    build_hglrc_ui();
+    build_compact_ui();
     bsp_display_unlock();
 
     vTaskDelay(pdMS_TO_TICKS(200));

@@ -1,20 +1,35 @@
 menu "Betaflight bridge"
 
-    config BRIDGE_DISPLAY
-        bool "Native LVGL touch status display"
+    config BRIDGE_DISPLAY_TOUCH
+        bool "Touch status display"
         default n
         help
-            Drive an on-board LCD with a native LVGL touch UI showing the
-            bridge status (FC link, Configurator client, WiFi, IP) and
-            offering WiFi scan/join. Enabled per-board via the board's
-            sdkconfig.defaults; pulls in the board BSP and LVGL managed
-            components, which are not fetched when disabled.
+            Drive a large on-board LCD with a native LVGL touch UI showing the
+            bridge status (FC link, app client, WiFi, IP) and offering WiFi
+            scan/join. Enabled per-board via the board's sdkconfig.defaults;
+            the panel driver comes from the board's board_display.h.
 
-    config BRIDGE_HGLRC_DISPLAY
-        bool "HGLRC LVGL status display"
+    config BRIDGE_DISPLAY_COMPACT
+        bool "Compact status display"
         default n
         help
-            Drive the HGLRC board's directly connected ST7789 display using
-            the LVGL 9 display-driver stack.
+            Drive a small on-board LCD with a read-only LVGL status screen:
+            FC link, client, WiFi, connect URLs and a QR code. Alternative to
+            BRIDGE_DISPLAY_TOUCH for boards without a touch panel.
+
+    config BRIDGE_ADC_VOLTAGE
+        bool "Input voltage monitor"
+        default n
+        help
+            Sample the board's input-voltage divider and show the result on
+            the status display. Requires the board to define BOARD_ADC_GPIO
+            and BOARD_ADC_DIVIDER_RATIO and to provide adc_voltage.c.
+
+    config BRIDGE_WEB_I18N
+        bool "Bilingual web UI"
+        default n
+        help
+            Serve the English/Chinese web page with a light/dark theme toggle
+            instead of the default English-only dark page.
 
 endmenu
