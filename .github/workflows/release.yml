@@ -1,18 +1,16 @@
 name: release
 
-# Publishing a release builds every board and attaches its images. The release
-# itself is created by hand (as betaflight does), so the notes can be reviewed
-# before anything ships.
+# Pushing a CalVer tag prepares the release as a draft. Nothing is public until
+# a human publishes it, and the tag is checked before anything is created, so a
+# tag that disagrees with src/main/version.h fails here rather than becoming a
+# release with no images attached.
 #
 #   1. bump the CalVer components in src/main/version.h and merge that
-#   2. gh release create "$(make version)" --generate-notes --draft
-#   3. publish the draft
-#
-# Step 2's tag must equal `make version`; the guard below refuses anything else
-# rather than shipping an image whose filename contradicts its tag.
+#   2. git tag "$(make version)" && git push origin "$(make version)"
+#   3. review the draft this leaves, then publish it
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['[0-9]*']
 
 permissions: {}
 
@@ -27,7 +25,7 @@ jobs:
           submodules: false
       - name: Tag must match src/main/version.h
         env:
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.ref_name }}
         run: |
           version=$(make version)
           if [ "$TAG" != "$version" ]; then
@@ -55,7 +53,7 @@ jobs:
     needs: discover
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # attach the images to the release
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -92,8 +90,42 @@ jobs:
           . ./esp-idf/export.sh
           make ${{ matrix.board }}
 
-      - name: Attach images to the release
+      - name: Stash the images
+        uses: actions/upload-artifact@v4
+        with:
+          name: images-${{ matrix.board }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  # Depends on the whole matrix, so a board that fails to build leaves no draft
+  # rather than a release carrying only the boards that happened to succeed.
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the draft and attach the images
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Collect every board's images
+        uses: actions/download-artifact@v4
+        with:
+          pattern: images-*
+          merge-multiple: true
+          path: dist
+
+      - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/betaflight-bridge-${{ matrix.board }}-*.bin --clobber
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -1 dist/
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.bin --clobber
+          else
+            gh release create "$TAG" dist/*.bin \
+              --draft --generate-notes --title "$TAG"
+          fi
+          echo "Draft ready: review the notes, then publish." >> "$GITHUB_STEP_SUMMARY"

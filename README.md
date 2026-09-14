@@ -206,15 +206,21 @@ To cut a release:
 1. Bump the components in `src/main/version.h` and merge that. Clear
    `BRIDGE_VERSION_SUFFIX` to `""` for a final, or set it to `"-rc1"` and
    friends for a pre-release.
-2. Create the release, tagged with exactly `make version` and no `v` prefix:
+2. Tag the merge commit with exactly `make version`, no `v` prefix, and push
+   the tag:
 
    ```sh
-   gh release create "$(make version)" --generate-notes --draft
+   git tag "$(make version)" && git push origin "$(make version)"
    ```
 
-3. Review the generated notes, then publish. Publishing triggers
-   `.github/workflows/release.yml`, which refuses the tag if it disagrees with
-   `src/main/version.h`, then builds every board and attaches both images.
+3. `.github/workflows/release.yml` picks the tag up. It fails immediately if
+   the tag disagrees with `src/main/version.h`, so a mistyped tag never becomes
+   a release. Otherwise it builds every board and leaves a **draft** release
+   carrying both images for each, with generated notes.
+4. Review the draft, then publish it.
+
+Nothing is public until step 4, and the images are attached in one go after
+every board has built, so a release is never left holding a partial set.
 
 Release notes are GitHub's own generator, bucketed by the labels in
 `.github/release.yml`. An unlabelled PR still appears, under "Changes".
