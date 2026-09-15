@@ -30,7 +30,7 @@ jobs:
         id: app
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.PR_AUTO_APPROVE_APP_ID }}
+          client-id: ${{ vars.PR_AUTO_APPROVE_APP_CLIENT_ID }}
           private-key: ${{ secrets.PR_AUTO_APPROVE_APP_KEY }}
           permission-pull-requests: write
 
