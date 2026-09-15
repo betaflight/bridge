@@ -4,7 +4,7 @@ name: Copilot PR auto-approve
 # fork pull requests but runs with a read-only token and no repository secrets
 # (there is no pull_request_review_target), so it cannot approve the fork PRs
 # that make up most of our traffic. A schedule runs on the default branch in the
-# base repository, where the bot token is available.
+# base repository, where the app credentials are available.
 on:
   schedule:
     - cron: '0 * * * *'
@@ -17,13 +17,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # GITHUB_TOKEN is not permitted to approve a pull request, so this needs a
-      # separate bot token with pull-requests: write.
+      # GITHUB_TOKEN is not permitted to approve a pull request, so the approval
+      # comes from a GitHub App. Its installation token is minted per run and
+      # expires within the hour, so there is no long-lived credential to rotate
+      # and nothing for the org's PAT lifetime policy to reject.
+      - name: Mint an installation token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.PR_AUTO_APPROVE_APP_ID }}
+          private-key: ${{ secrets.PR_AUTO_APPROVE_APP_KEY }}
+
       - name: Approve pull requests Copilot has cleared
         env:
-          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           GH_REPO: ${{ github.repository }}
-          BOT: ${{ vars.PR_AUTO_APPROVE_BOT_LOGIN }}
+          # Derived from the app itself rather than configured, so the duplicate
+          # check cannot drift from whoever is actually doing the approving.
+          BOT: ${{ steps.app.outputs.app-slug }}[bot]
           REVIEWER: copilot-pull-request-reviewer[bot]
         run: |
           set -euo pipefail
