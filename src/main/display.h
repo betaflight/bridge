@@ -19,10 +19,11 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Native LVGL touch UI for boards with an LCD (CONFIG_BRIDGE_DISPLAY):
-// mirrors the web status page and offers WiFi scan/join on screen.
-// A board without a display gets a no-op. Call once after the bridge, WiFi,
-// TCP and USB-host subsystems are started.
+// Native LVGL status UI for boards with an LCD: the full touch variant
+// (CONFIG_BRIDGE_DISPLAY_TOUCH) mirrors the web status page and offers WiFi
+// scan/join on screen; the compact variant (CONFIG_BRIDGE_DISPLAY_COMPACT) is
+// read-only. A board without a display gets a no-op. Call once after the
+// bridge, WiFi, TCP and USB-host subsystems are started.
 #pragma once
 
 void display_start(void);

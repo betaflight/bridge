@@ -1,0 +1,11 @@
+# Managed components needed only by this board. Only the selected board's
+# directory is added to the build, so nothing here is fetched for other boards.
+# Both are public: board_display.h exposes them to the shared display code.
+dependencies:
+  lvgl/lvgl:
+    version: "^9.2.0"
+    public: true
+  # Board support (LCD panel + touch + LVGL glue) behind board_display.h.
+  waveshare/esp32_s3_touch_lcd_4b:
+    version: "^2.0.0"
+    public: true

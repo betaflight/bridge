@@ -1,8 +1,8 @@
 #include "sdkconfig.h"
 
-#if CONFIG_BRIDGE_HGLRC_DISPLAY
+#if CONFIG_BRIDGE_DISPLAY_COMPACT
 
-#include "lcd_st7789.h"
+#include "board_display.h"
 
 #include "esp_lcd_io_spi.h"
 #include "esp_lcd_panel_ops.h"
@@ -14,7 +14,7 @@
 
 #include "board.h"
 
-#define TAG "hglrc_lcd"
+#define TAG "board_lcd"
 #define LCD_SPI_CLOCK_HZ (60 * 1000 * 1000)
 #define LCD_BUFFER_LINES 40
 

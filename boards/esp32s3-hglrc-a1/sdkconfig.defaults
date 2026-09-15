@@ -18,7 +18,11 @@ CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
 CONFIG_APP_PROJECT_VER="esp32s3-hglrc-a1"
 
 # Native LVGL text display on the directly connected ST7789 panel.
-CONFIG_BRIDGE_HGLRC_DISPLAY=y
+CONFIG_BRIDGE_DISPLAY_COMPACT=y
+# Input voltage divider on BOARD_ADC_GPIO, shown in the display header.
+CONFIG_BRIDGE_ADC_VOLTAGE=y
+# English/Chinese web page with a light/dark theme toggle.
+CONFIG_BRIDGE_WEB_I18N=y
 CONFIG_LV_COLOR_DEPTH_16=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
 CONFIG_LV_FONT_MONTSERRAT_12=y

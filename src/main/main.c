@@ -43,7 +43,7 @@
 #include "leds.h"
 #include "display.h"
 
-#if CONFIG_BRIDGE_HGLRC_DISPLAY
+#if CONFIG_BRIDGE_ADC_VOLTAGE
 #include "adc_voltage.h"
 #endif
 
@@ -59,7 +59,7 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(err);
 
-#if CONFIG_BRIDGE_HGLRC_DISPLAY
+#if CONFIG_BRIDGE_ADC_VOLTAGE
     esp_err_t adc_err = adc_voltage_init();
     if (adc_err != ESP_OK) {
         ESP_LOGW(TAG, "voltage monitor disabled: %s", esp_err_to_name(adc_err));

@@ -19,16 +19,9 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Waveshare ESP32-S3-Touch-LCD-4B (N16R8): 4.0" 480x480 ST7701 RGB panel with
-// GT911 touch, driven by the waveshare/esp32_s3_touch_lcd_4b BSP component
-// (enabled via CONFIG_BRIDGE_DISPLAY_TOUCH in this board's sdkconfig.defaults).
-//
-// The single USB-C carries the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
-// shared between flashing/console (USB-Serial-JTAG) and the USB-host bridge —
-// the serial console drops out once host mode engages (same as esp32s3-zero).
-// UART0 (TX GPIO43 / RX GPIO44) is on the header for a persistent log console.
-//
-// No user LEDs: status is shown on the LCD.
+// Panel/touch BSP for boards that set CONFIG_BRIDGE_DISPLAY_TOUCH. display.c includes
+// this by name only, so the vendor BSP it resolves to stays a board detail; the
+// bsp_display_*() API it exposes is the same across ESP-BSP components.
 #pragma once
 
-#define BOARD_NAME "esp32s3-touch-lcd-4b"
+#include "bsp/esp32_s3_touch_lcd_4b.h"

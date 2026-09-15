@@ -52,8 +52,8 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
 
 // Single-page UI. Status fields and the network list are filled by JS polling
 // /status and /scan, so the page itself is static and cacheable.
-#if CONFIG_BRIDGE_HGLRC_DISPLAY
-// Add Chinese and English switching and day and night theme switching
+#if CONFIG_BRIDGE_WEB_I18N
+// English/Chinese switching plus a light/dark theme toggle.
 static const char PAGE[] =
     "<!DOCTYPE html><html><head>"
     "<meta charset=\"utf-8\">"

@@ -1,0 +1,9 @@
+# Managed components needed only by this board. Only the selected board's
+# directory is added to the build, so nothing here is fetched for other boards.
+dependencies:
+  # Public: board_display.h exposes LVGL types to the shared display code.
+  lvgl/lvgl:
+    version: "^9.2.0"
+    public: true
+  # LVGL <-> esp_lcd glue for the directly driven ST7789 panel.
+  espressif/esp_lvgl_port: "^2.8.0~1"
