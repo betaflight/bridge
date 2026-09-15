@@ -201,17 +201,52 @@ reconfigure, so you don't need to delete `sdkconfig` by hand.
 
 | File | Offset | Use |
 |------|--------|-----|
-| `betaflight-bridge-<board>[-<version>].bin` | `0x20000` | OTA update from the web UI |
-| `betaflight-bridge-<board>[-<version>]-factory.bin` | `0x0` | first flash of a stock board |
+| `betaflight-bridge-<board>-<version>.bin` | `0x20000` | OTA update from the web UI |
+| `betaflight-bridge-<board>-<version>-factory.bin` | `0x0` | first flash of a stock board |
 
 The factory image is the app plus the bootloader, partition table and a blank
 otadata/NVS, merged into one blob — everything a bare board needs. The plain
 image is the app alone, which is what the OTA endpoint expects.
 
-The `-<version>` suffix is the `BRIDGE_VERSION` in `src/main/version.h`, so a
-plain `make <board>` already stamps it. Override it with `make <board>
-VERSION=x.y.z` — the release workflow passes the tag. Examples below use
-`2026.6.0` in place of the version.
+The `-<version>` suffix comes from `src/main/version.h` and is the same string
+the firmware reports in the web UI; `make version` prints it. Examples below
+use `2026.6.0` in place of the version.
+
+### Versioning and releases
+
+Calendar versioning, `YEAR.MONTH.PATCH` with an optional pre-release suffix,
+the shape betaflight uses — but on the bridge's own release clock, so the
+numbers will not line up with a betaflight release of the same name. `PATCH` is
+`0` for the first release of a `YEAR.MONTH` and goes up for bug-fix releases.
+
+`src/main/version.h` is the only place it is written down. There is no way to
+override it at build time: an image is whatever the committed header says, so a
+filename can never contradict the firmware inside it.
+
+To cut a release:
+
+1. Bump the components in `src/main/version.h` and merge that. Clear
+   `BRIDGE_VERSION_SUFFIX` to `""` for a final, or set it to `"-rc1"` and
+   friends for a pre-release.
+2. Tag the merge commit with exactly `make version`, no `v` prefix, and push
+   the tag:
+
+   ```sh
+   git tag "$(make version)" && git push origin "$(make version)"
+   ```
+
+3. `.github/workflows/release.yml` picks the tag up. It fails immediately if
+   the tag disagrees with `src/main/version.h`, so a mistyped tag never becomes
+   a release. Otherwise it builds every board and leaves a **draft** release
+   carrying both images for each, with generated notes. A suffixed version is
+   marked as a pre-release automatically; you don't have to tick the box.
+4. Review the draft, then publish it.
+
+Nothing is public until step 4, and the images are attached in one go after
+every board has built, so a release is never left holding a partial set.
+
+Release notes are GitHub's own generator, bucketed by the labels in
+`.github/release.yml`. An unlabelled PR still appears, under "Changes".
 
 To flash and monitor over serial, use `idf.py` directly:
 

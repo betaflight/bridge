@@ -1,0 +1,146 @@
+name: release
+
+# Pushing a CalVer tag prepares the release as a draft. Nothing is public until
+# a human publishes it, and the tag is checked before anything is created, so a
+# tag that disagrees with src/main/version.h fails here rather than becoming a
+# release with no images attached.
+#
+#   1. bump the CalVer components in src/main/version.h and merge that
+#   2. git tag "$(make version)" && git push origin "$(make version)"
+#   3. review the draft this leaves, then publish it
+on:
+  push:
+    tags: ['[0-9]*']
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Tag must match src/main/version.h
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(make version)
+          if [ "$TAG" != "$version" ]; then
+            echo "::error::tag '$TAG' does not match src/main/version.h ('$version')"
+            exit 1
+          fi
+          echo "releasing $version"
+
+  # Board list is read from boards/ — never hardcoded (matches the Makefile).
+  discover:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      boards: ${{ steps.list.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - id: list
+        run: echo "boards=$(make -s list | jq -R . | jq -cs .)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJson(needs.discover.outputs.boards) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Fetch pinned ESP-IDF
+        id: idf
+        run: |
+          git submodule update --init --depth 1 esp-idf
+          git -C esp-idf submodule update --init --depth 1 --recursive
+          echo "sha=$(git -C esp-idf rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ESP-IDF tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.espressif
+          key: esp-tools-${{ runner.os }}-${{ steps.idf.outputs.sha }}-esp32s3
+
+      - name: Cache managed components
+        uses: actions/cache@v4
+        with:
+          path: managed_components
+          key: managed-${{ runner.os }}-${{ matrix.board }}-${{ hashFiles('src/main/idf_component.yml', format('boards/{0}/idf_component.yml', matrix.board)) }}
+
+      - name: Install ESP-IDF tools
+        run: ./esp-idf/install.sh esp32s3
+
+      - name: Build ${{ matrix.board }}
+        run: |
+          . ./esp-idf/export.sh
+          make ${{ matrix.board }}
+
+      - name: Stash the images
+        uses: actions/upload-artifact@v4
+        with:
+          name: images-${{ matrix.board }}
+          path: dist/*.bin
+          if-no-files-found: error
+
+  # Depends on the whole matrix, so a board that fails to build leaves no draft
+  # rather than a release carrying only the boards that happened to succeed.
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the draft and attach the images
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Collect every board's images
+        uses: actions/download-artifact@v4
+        with:
+          pattern: images-*
+          merge-multiple: true
+          path: dist
+
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -1 dist/
+
+          # A CalVer tag carries a suffix only when it is a pre-release
+          # (2026.6.0-rc1 against 2026.6.1), which is what version.h encodes.
+          extra=()
+          case "$TAG" in
+            *-*) extra+=(--prerelease) ;;
+          esac
+
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            # Re-run over a tag that already shipped: leave it alone. --clobber
+            # would swap the assets out from under a published release, and a
+            # failure part-way would leave it holding an incomplete set.
+            if [ "$draft" != "true" ]; then
+              echo "::error::release $TAG is already published; refusing to touch its assets"
+              exit 1
+            fi
+            gh release upload "$TAG" dist/*.bin --clobber
+          else
+            gh release create "$TAG" dist/*.bin \
+              --draft --generate-notes --title "$TAG" "${extra[@]}"
+          fi
+          echo "Draft ready: review the notes, then publish." >> "$GITHUB_STEP_SUMMARY"

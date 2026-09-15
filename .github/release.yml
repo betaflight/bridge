@@ -1,0 +1,18 @@
+# Configures GitHub's own release-note generator, used when a release is
+# created with --generate-notes. Every merged PR lands in one of these buckets;
+# the catch-all is last so nothing is dropped just because it went unlabelled.
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - wontfix
+  categories:
+    - title: Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Changes
+      labels:
+        - "*"

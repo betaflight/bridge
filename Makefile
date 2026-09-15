@@ -3,7 +3,7 @@
 #   make                 show this help (the board list is read from boards/)
 #   make esp_tools       fetch the ESP-IDF submodule and install the toolchain
 #   make <board>         build the flash/OTA image for <board>
-#   make <board> VERSION=x.y.z   stamp that version into the image (else default)
+#   make version         print the version the images will carry
 #   make clean           remove build artefacts
 #
 # It sources the vendored ESP-IDF (./esp-idf/export.sh) automatically if idf.py
@@ -18,11 +18,20 @@ IDF_TARGET := esp32s3
 # published per-board image is dist/$(PROJECT)-<board>.bin.
 PROJECT := betaflight-bridge
 
-# Firmware version. Single source of truth is the BRIDGE_VERSION #define in
-# src/main/version.h; we read it so an unversioned `make <board>` still stamps
-# and names the artefact with the coded default. Override with `make <board>
-# VERSION=x.y.z` (the release workflow passes the tag).
-VERSION ?= $(shell sed -n 's/^[[:space:]]*#define[[:space:]]\+BRIDGE_VERSION[[:space:]]\+"\(.*\)".*/\1/p' src/main/version.h)
+# Firmware version. Single source of truth is the CalVer components in
+# src/main/version.h, joined here exactly as the header joins them so the image
+# filename cannot disagree with the string compiled into the firmware.
+#
+# `override` on purpose: nothing is passed to the compiler to change the version
+# any more, so honouring `make <board> VERSION=x` would only rename the image
+# while the firmware kept reporting the header value. The release is whatever
+# the committed header says.
+override VERSION := $(shell awk \
+	'/^#define BRIDGE_VERSION_YEAR/   {y=$$3} \
+	 /^#define BRIDGE_VERSION_MONTH/  {m=$$3} \
+	 /^#define BRIDGE_VERSION_PATCH/  {p=$$3} \
+	 /^#define BRIDGE_VERSION_SUFFIX/ {s=$$3; gsub(/"/, "", s)} \
+	 END {printf "%s.%s.%s%s", y, m, p, s}' src/main/version.h)
 
 # Discover boards from the directory list — never hardcoded. Anything under
 # boards/ with an sdkconfig.defaults is a valid target.
@@ -36,7 +45,7 @@ DEFAULT_BOARD := $(shell grep 'BOARD "' CMakeLists.txt | head -1 | cut -d'"' -f2
 LAST_BOARD := build/.last_board
 
 .DEFAULT_GOAL := help
-.PHONY: help list esp_tools clean $(BOARDS)
+.PHONY: help list version esp_tools clean $(BOARDS)
 
 help:
 	@echo "betaflight-bridge — ESP32-S3 USB-host-to-WiFi bridge"
@@ -44,6 +53,7 @@ help:
 	@echo "Usage:"
 	@echo "  make esp_tools build/update the ESP-IDF submodule and toolchain"
 	@echo "  make <board>   build the OTA and factory images for <board>"
+	@echo "  make version   print the version the images will carry"
 	@echo "  make clean     remove build artefacts"
 	@echo "  make help      show this message"
 	@echo ""
@@ -56,9 +66,13 @@ help:
 	  fi; \
 	done
 	@echo ""
-	@echo "Each build writes two images to dist/ (-<version> from VERSION):"
-	@echo "  $(PROJECT)-<board>[-<version>].bin          app only, for OTA (0x20000)"
-	@echo "  $(PROJECT)-<board>[-<version>]-factory.bin  whole flash, first flash (0x0)"
+	@echo "Each build writes two images to dist/, stamped $(VERSION):"
+	@echo "  $(PROJECT)-<board>-$(VERSION).bin          app only, for OTA (0x20000)"
+	@echo "  $(PROJECT)-<board>-$(VERSION)-factory.bin  whole flash, first flash (0x0)"
+
+# The version the release must be tagged with (see src/main/version.h).
+version:
+	@echo "$(VERSION)"
 
 # Bare board names (machine-readable, one per line) for scripting/CI.
 list:
@@ -80,13 +94,8 @@ esp_tools:
 	echo ""; \
 	echo "==> ESP-IDF ready. Build with: make <board>"
 
-# Published image name: dist/<project>-<board>[-<VERSION>].bin (version appended
-# when VERSION is set, e.g. by the release workflow). Sanitise the version for
-# the filename only — release tags may contain '/' (e.g. release/v1.2.3), which
-# would otherwise turn the cp target into a nested path. -DBRIDGE_VERSION still
-# receives the original VERSION, so the UI shows the tag verbatim.
-VERSION_FILENAME := $(subst /,-,$(VERSION))
-$(BOARDS): IMG = $(PROJECT)-$@$(if $(VERSION_FILENAME),-$(VERSION_FILENAME))
+# Published image name: dist/<project>-<board>-<version>.bin.
+$(BOARDS): IMG = $(PROJECT)-$@-$(VERSION)
 
 # Each build also emits <IMG>-factory.bin: bootloader + partition table + blank
 # otadata/NVS + app merged into one blob flashed at 0x0, so a stock board can be
@@ -110,7 +119,7 @@ $(BOARDS):
 	  idf.py fullclean >/dev/null 2>&1 || true; \
 	  idf.py -DBOARD=$@ set-target $(IDF_TARGET); \
 	fi; \
-	idf.py -DBOARD=$@ $(if $(VERSION),-DBRIDGE_VERSION=$(VERSION),) build; \
+	idf.py -DBOARD=$@ build; \
 	mkdir -p dist; \
 	cp build/$(PROJECT).bin dist/$(IMG).bin; \
 	args=$$(ls build/flash_args build/flash_project_args 2>/dev/null | head -1); \

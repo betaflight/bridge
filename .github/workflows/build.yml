@@ -5,8 +5,6 @@ on:
     branches: [master]
   pull_request:
   workflow_dispatch:
-  release:
-    types: [published]
 
 jobs:
   # Board list is read from boards/ — never hardcoded (matches the Makefile).
@@ -29,7 +27,7 @@ jobs:
     needs: discover
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # attach built images to the release
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -68,23 +66,15 @@ jobs:
       - name: Install ESP-IDF tools
         run: ./esp-idf/install.sh esp32s3
 
-      # On a release, stamp the tag into the image; otherwise the default in
-      # http_status.c is used.
+      # The version comes from src/main/version.h; releases are built by
+      # release.yml, which checks the tag against it first.
       - name: Build ${{ matrix.board }}
-        env:
-          VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
         run: |
           . ./esp-idf/export.sh
-          make ${{ matrix.board }} ${VERSION:+VERSION=$VERSION}
+          make ${{ matrix.board }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: betaflight-bridge-${{ matrix.board }}
-          path: dist/betaflight-bridge-${{ matrix.board }}*.bin
-
-      - name: Attach to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/betaflight-bridge-${{ matrix.board }}*.bin
+          path: dist/betaflight-bridge-${{ matrix.board }}-*.bin
