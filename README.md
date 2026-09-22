@@ -418,7 +418,9 @@ bootloader presents as mass storage rather than DFU, are not implemented yet.
 
 If the FC is already sitting in its bootloader the backup and reboot phases are
 skipped, so a board left in DFU by a failed attempt can simply be flashed again.
-A failure leaves it in DFU and recoverable — no power cycle needed.
+A failure during erase, write or verify leaves it in DFU and recoverable, no
+power cycle needed. A backup failure happens before the bootloader is entered
+and a restore failure after it has been left, so neither leaves it in DFU.
 
 ### Endpoints
 

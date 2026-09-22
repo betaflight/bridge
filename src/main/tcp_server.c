@@ -209,11 +209,15 @@ static void tcp_accept_task(void *arg)
                 close(fd);
                 continue;
             }
-            if (s_client >= 0) {
-                ESP_LOGI(TAG, "new client; dropping current TCP client");
-                close_client();
-            }
+            // Adopt before dropping the predecessor: close_client() releases
+            // the claim whenever TCP owns the bridge, which would undo the one
+            // just taken for this socket.
+            const int prev = s_client;
             adopt_client(fd);   // a WS owner notices and drops itself
+            if (prev >= 0) {
+                ESP_LOGI(TAG, "new client; dropped the previous TCP client");
+                close(prev);
+            }
         }
     }
 }

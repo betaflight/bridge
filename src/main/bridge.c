@@ -40,6 +40,13 @@ static StreamBufferHandle_t s_net_to_usb;  // Configurator -> FC
 static SemaphoreHandle_t s_u2n_mux;   // guards receives from s_usb_to_net
 static SemaphoreHandle_t s_n2u_mux;   // guards receives from s_net_to_usb
 
+// Ownership changes and the buffer reset that goes with them run one at a
+// time. Checking the owner after leaving the critical section is not enough: a
+// claimant preempted between taking ownership and resetting would otherwise
+// drain the buffers of whoever took over meanwhile, which for the flasher means
+// eating a CLI reply mid-backup. Never taken while holding s_owner_mux.
+static SemaphoreHandle_t s_claim_mux;
+
 // Total bytes moved to/from the FC in either direction. Monotonic; sampled by
 // the LED indicator to detect traffic. Plain increments are fine — a missed
 // update only costs one LED tick.
@@ -56,10 +63,12 @@ void bridge_init(void)
     s_net_to_usb = xStreamBufferCreate(BRIDGE_BUF_SIZE, BRIDGE_TRIGGER);
     s_u2n_mux = xSemaphoreCreateMutex();
     s_n2u_mux = xSemaphoreCreateMutex();
+    s_claim_mux = xSemaphoreCreateMutex();
     configASSERT(s_usb_to_net);
     configASSERT(s_net_to_usb);
     configASSERT(s_u2n_mux);
     configASSERT(s_n2u_mux);
+    configASSERT(s_claim_mux);
 }
 
 // Arbitration for the single FC stream. The claim is a tiny spinlock-guarded
@@ -67,30 +76,22 @@ void bridge_init(void)
 static portMUX_TYPE s_owner_mux = portMUX_INITIALIZER_UNLOCKED;
 static bridge_client_t s_owner = BRIDGE_CLIENT_NONE;
 
-// Drop stale bytes for a fresh session, but only while `who` still owns the
-// stream. A claimant preempted between taking ownership and resetting could
-// otherwise drain the buffers of whoever took over in the meantime - which for
-// the flasher means eating a CLI reply mid-backup.
-static void reset_if_owner(bridge_client_t who)
-{
-    if (s_owner == who) {
-        bridge_reset();
-    }
-}
-
 void bridge_claim(bridge_client_t who)
 {
     // Newest client wins: take ownership unconditionally. The previous owner's
     // teardown is gated on still owning, so it won't release this claim.
+    xSemaphoreTake(s_claim_mux, portMAX_DELAY);
     taskENTER_CRITICAL(&s_owner_mux);
     s_owner = who;
     taskEXIT_CRITICAL(&s_owner_mux);
-    reset_if_owner(who);
+    bridge_reset();   // fresh session: drop any stale MSP bytes
+    xSemaphoreGive(s_claim_mux);
 }
 
 bool bridge_claim_unless_flashing(bridge_client_t who)
 {
     bool claimed;
+    xSemaphoreTake(s_claim_mux, portMAX_DELAY);
     taskENTER_CRITICAL(&s_owner_mux);
     claimed = (s_owner != BRIDGE_CLIENT_FLASH);
     if (claimed) {
@@ -98,8 +99,9 @@ bool bridge_claim_unless_flashing(bridge_client_t who)
     }
     taskEXIT_CRITICAL(&s_owner_mux);
     if (claimed) {
-        reset_if_owner(who);
+        bridge_reset();
     }
+    xSemaphoreGive(s_claim_mux);
     return claimed;
 }
 
@@ -110,11 +112,13 @@ bool bridge_is_flashing(void)
 
 void bridge_release(bridge_client_t who)
 {
+    xSemaphoreTake(s_claim_mux, portMAX_DELAY);
     taskENTER_CRITICAL(&s_owner_mux);
     if (s_owner == who) {
         s_owner = BRIDGE_CLIENT_NONE;
     }
     taskEXIT_CRITICAL(&s_owner_mux);
+    xSemaphoreGive(s_claim_mux);
 }
 
 bridge_client_t bridge_client_owner(void)

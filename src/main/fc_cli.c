@@ -331,14 +331,18 @@ esp_err_t fc_cli_backup(void)
 {
     fc_cli_backup_free();
 
+    // Capture into a local buffer and publish it only once the prompt comes
+    // back. Growing the shared pointer as bytes arrive would let /dfu/backup
+    // hand the user a half-written configuration and never offer the rest.
     size_t cap = BACKUP_CHUNK;
+    size_t len = 0;
     // PSRAM where the board has it, so a large dump does not eat the internal
     // heap the WiFi and USB stacks need.
-    s_backup = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!s_backup) {
-        s_backup = malloc(cap);
+    char *buf = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buf) {
+        buf = malloc(cap);
     }
-    if (!s_backup) {
+    if (!buf) {
         return ESP_ERR_NO_MEM;
     }
 
@@ -347,49 +351,48 @@ esp_err_t fc_cli_backup(void)
 
     const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(CLI_PROMPT_MS);
     while (xTaskGetTickCount() < deadline) {
-        if (s_backup_len + 512 > cap) {
-            backup_lock();
+        if (len + 512 > cap) {
             if (cap >= BACKUP_MAX) {
-                backup_unlock();
                 ESP_LOGE(TAG, "backup exceeded %d bytes", BACKUP_MAX);
-                fc_cli_backup_free();
+                free(buf);
                 return ESP_ERR_NO_MEM;
             }
             const size_t want = cap * 2 > BACKUP_MAX ? BACKUP_MAX : cap * 2;
-            char *grown = realloc(s_backup, want);
+            char *grown = realloc(buf, want);
             if (!grown) {
-                backup_unlock();
-                fc_cli_backup_free();
+                free(buf);
                 return ESP_ERR_NO_MEM;
             }
-            s_backup = grown;
+            buf = grown;
             cap = want;
-            backup_unlock();
         }
 
-        const size_t n = rx_read((uint8_t *)s_backup + s_backup_len,
-                                 cap - s_backup_len - 1, 500);
+        const size_t n = rx_read((uint8_t *)buf + len, cap - len - 1, 500);
         if (n == 0) {
             continue;
         }
         for (size_t i = 0; i < n; i++) {
-            if (!is_cli_text((uint8_t)s_backup[s_backup_len + i])) {
+            if (!is_cli_text((uint8_t)buf[len + i])) {
                 ESP_LOGE(TAG, "non-text in CLI reply; FC is still in MSP mode");
-                fc_cli_backup_free();
+                free(buf);
                 return ESP_ERR_INVALID_RESPONSE;
             }
         }
-        s_backup_len += n;
-        s_backup[s_backup_len] = '\0';
+        len += n;
+        buf[len] = '\0';
 
-        if (ends_with_prompt(s_backup, s_backup_len)) {
-            ESP_LOGI(TAG, "backup captured, %u bytes", (unsigned)s_backup_len);
+        if (ends_with_prompt(buf, len)) {
+            backup_lock();
+            s_backup = buf;
+            s_backup_len = len;
+            backup_unlock();
+            ESP_LOGI(TAG, "backup captured, %u bytes", (unsigned)len);
             return ESP_OK;
         }
     }
 
     ESP_LOGE(TAG, "CLI prompt never returned");
-    fc_cli_backup_free();
+    free(buf);
     return ESP_ERR_TIMEOUT;
 }
 
@@ -432,7 +435,12 @@ esp_err_t fc_cli_restore(uint32_t *applied, uint32_t *skipped)
     // until the final save, so one reboot covers the whole restore.
     rx_drain();
     tx_line("defaults nosave");
-    await_prompt(reply, sizeof(reply), 5000);
+    if (!await_prompt(reply, sizeof(reply), 5000)) {
+        // Without the reset the dump means something different, and a late
+        // prompt would shift every command/reply pair after it.
+        ESP_LOGE(TAG, "no prompt after 'defaults nosave'");
+        return ESP_ERR_TIMEOUT;
+    }
 
     const char *p = s_backup;
     const char *end = s_backup + s_backup_len;

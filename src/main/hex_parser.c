@@ -202,10 +202,22 @@ bool hex_parser_finish(hex_parser_t *p)
     if (p->error) {
         return false;
     }
-    // An unterminated final line is only acceptable if it is empty: anything
-    // else means the upload was cut short mid-record.
-    if (p->line_len != 0 || p->line_overflow) {
-        return fail(p, "file ends mid-record");
+    if (p->line_overflow) {
+        return fail(p, "record too long");
+    }
+    // A file may legally end without a line terminator, and rejecting that
+    // would fail the job after the whole image had already been written. A
+    // record genuinely cut short still fails its own length or checksum check.
+    if (p->line_len != 0) {
+        const size_t line_len = p->line_len;
+        p->line_len = 0;
+        if (p->eof) {
+            return fail(p, "data follows the end-of-file record");
+        }
+        p->line[line_len] = '\0';
+        if (!parse_line(p, p->line, line_len)) {
+            return false;
+        }
     }
     if (!p->eof) {
         return fail(p, "no end-of-file record; upload is truncated");

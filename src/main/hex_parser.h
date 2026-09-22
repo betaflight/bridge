@@ -65,8 +65,9 @@ typedef struct {
 void hex_parser_init(hex_parser_t *p, hex_data_fn on_data, void *ctx);
 
 // Feed the next `len` bytes of the file. Returns false once the parse has
-// failed; the reason is then available from hex_parser_error(). Bytes after the
-// EOF record are ignored, which tolerates the trailing newline most tools emit.
+// failed; the reason is then available from hex_parser_error(). Blank lines
+// after the EOF record are ignored, which tolerates the trailing newline most
+// tools emit; any further record fails the parse.
 bool hex_parser_push(hex_parser_t *p, const uint8_t *data, size_t len);
 
 // Call once the upload is complete. Fails if no EOF record was seen, which is
