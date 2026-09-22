@@ -219,6 +219,13 @@ out:
 
 // ------------------------------------------------------------ DFU requests
 
+esp_err_t dfu_host_set_alt(uint8_t alt)
+{
+    return ctrl_xfer(USB_BM_REQUEST_TYPE_DIR_OUT | USB_BM_REQUEST_TYPE_TYPE_STANDARD |
+                         USB_BM_REQUEST_TYPE_RECIP_INTERFACE,
+                     USB_B_REQUEST_SET_INTERFACE, alt, DFU_INTERFACE, NULL, 0, NULL);
+}
+
 esp_err_t dfu_host_get_status(dfu_status_t *out)
 {
     uint8_t buf[6] = {0};

@@ -151,9 +151,10 @@ static void net_tx_task(void *arg)
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
-        // A flash in progress owns the FC outright. Refuse before touching any
-        // of the session state below, so the existing client is left alone.
-        if (bridge_is_flashing()) {
+        // A flash in progress owns the FC outright. Claim before touching any
+        // of the session state below, so a refusal leaves the existing client
+        // alone and a flash starting mid-handshake cannot be missed.
+        if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_WS)) {
             ESP_LOGW(TAG, "refusing client: flashing the FC");
             httpd_resp_set_status(req, "503 Service Unavailable");
             httpd_resp_set_type(req, "text/plain");
@@ -185,12 +186,6 @@ static esp_err_t ws_handler(httpd_req_t *req)
             ESP_LOGI(TAG, "new client; dropping current WebSocket client");
             httpd_sess_trigger_close(prev_hd, prev_fd);
         }
-        // Take the bridge over from any owner (incl. a TCP client). Its own task
-        // notices the ownership change and drops it; we do not reach across
-        // transports here, which would risk blocking the httpd worker. If a
-        // flash started since the check above, leave it owning: this client
-        // simply gets no data until the flash finishes and it reconnects.
-        bridge_claim_unless_flashing(BRIDGE_CLIENT_WS);
         s_secure = (req->user_ctx != NULL);   // set per-server at registration
         ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;

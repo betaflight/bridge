@@ -67,6 +67,17 @@ void bridge_init(void)
 static portMUX_TYPE s_owner_mux = portMUX_INITIALIZER_UNLOCKED;
 static bridge_client_t s_owner = BRIDGE_CLIENT_NONE;
 
+// Drop stale bytes for a fresh session, but only while `who` still owns the
+// stream. A claimant preempted between taking ownership and resetting could
+// otherwise drain the buffers of whoever took over in the meantime - which for
+// the flasher means eating a CLI reply mid-backup.
+static void reset_if_owner(bridge_client_t who)
+{
+    if (s_owner == who) {
+        bridge_reset();
+    }
+}
+
 void bridge_claim(bridge_client_t who)
 {
     // Newest client wins: take ownership unconditionally. The previous owner's
@@ -74,7 +85,7 @@ void bridge_claim(bridge_client_t who)
     taskENTER_CRITICAL(&s_owner_mux);
     s_owner = who;
     taskEXIT_CRITICAL(&s_owner_mux);
-    bridge_reset();   // fresh session: drop any stale MSP bytes
+    reset_if_owner(who);
 }
 
 bool bridge_claim_unless_flashing(bridge_client_t who)
@@ -87,7 +98,7 @@ bool bridge_claim_unless_flashing(bridge_client_t who)
     }
     taskEXIT_CRITICAL(&s_owner_mux);
     if (claimed) {
-        bridge_reset();
+        reset_if_owner(who);
     }
     return claimed;
 }

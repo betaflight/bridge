@@ -87,6 +87,13 @@ bool dfu_host_get_info(dfu_host_info_t *out);
 // Block until a DFU device is present, or the timeout expires.
 bool dfu_host_wait(uint32_t timeout_ms);
 
+// Select the alternate setting that exposes a memory region. DfuSe puts each
+// region (internal flash, option bytes, external flash) on its own alternate
+// setting, and every address-pointer and erase request applies to whichever one
+// is current - so addressing a region without selecting it first writes to the
+// wrong memory.
+esp_err_t dfu_host_set_alt(uint8_t alt);
+
 // Raw DFU class requests. `dfu_host_dnload` with len 0 is the DfuSe leave
 // command; the caller must follow it with dfu_host_get_status().
 esp_err_t dfu_host_get_status(dfu_status_t *out);

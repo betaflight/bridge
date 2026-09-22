@@ -480,12 +480,19 @@ static bool do_probe(job_t *j)
     const dfu_region_t *opt = dfu_layout_find(&j->info.layout, "option_bytes");
     if (opt) {
         dfu_status_t st;
-        if (dfu_host_clear_state(false) == ESP_OK &&
+        if (dfu_host_set_alt(opt->alt) == ESP_OK &&
+            dfu_host_clear_state(false) == ESP_OK &&
             dfu_host_set_address_probe(opt->start_address, &st) == ESP_OK &&
             st.state == DFU_STATE_ERROR && st.status == DFU_STATUS_ERR_VENDOR) {
             fail(j, "flash is read protected; clear it with a full chip erase first");
             return false;
         }
+    }
+
+    // Everything from here addresses the region being programmed.
+    if (dfu_host_set_alt(j->region.alt) != ESP_OK) {
+        fail(j, "could not select %s", j->region.name);
+        return false;
     }
 
     if (dfu_host_clear_state(false) != ESP_OK) {
@@ -605,7 +612,15 @@ static bool do_finish(job_t *j)
     phase_begin(j, PH_FINISH);
     // Leaving is best-effort: the device detaches as it starts the firmware,
     // so the final status read usually fails and that is not an error.
-    dfu_host_leave(j->run_count ? j->runs[0].address : j->region.start_address);
+    const esp_err_t left = dfu_host_leave(j->run_count ? j->runs[0].address
+                                                       : j->region.start_address);
+    if (left != ESP_OK) {
+        // The image is written and verified; only the handover failed, so say
+        // which it was rather than blaming the flash.
+        fail(j, "flashed, but the FC would not leave DFU; power cycle it");
+        dfu_host_release();
+        return false;
+    }
 
     // Hand the port back explicitly rather than waiting to be told the device
     // went away: until the DFU client closes it, the CDC side will not look for
@@ -686,23 +701,47 @@ static void flash_task(void *arg)
 
 // --------------------------------------------------------------------- HTTP
 
+// Region names come from a USB string descriptor, so they can contain anything;
+// a stray quote would otherwise produce invalid JSON.
+static void json_str(char *dst, size_t dst_len, const char *src)
+{
+    size_t o = 0;
+    for (; *src && o + 2 < dst_len; src++) {
+        const unsigned char c = (unsigned char)*src;
+        if (c == '"' || c == '\\') {
+            dst[o++] = '\\';
+            dst[o++] = (char)c;
+        } else if (c >= 0x20 && c < 0x7f) {
+            dst[o++] = (char)c;
+        } else {
+            dst[o++] = '?';
+        }
+    }
+    dst[o] = '\0';
+}
+
 static void status_json(char *out, size_t out_len)
 {
     const job_t *j = &s_job;
+    char err_esc[sizeof(j->error) * 2];
+    json_str(err_esc, sizeof(err_esc), j->error);
+
     int n = snprintf(out, out_len,
         "{\"running\":%s,\"phase\":\"%s\",\"percent\":%" PRIu32 ","
         "\"consumed\":%" PRIu32 ",\"total\":%" PRIu32 ",\"written\":%" PRIu32 ","
         "\"backup\":%s,\"error\":\"%s\",\"phases\":[",
         j->running ? "true" : "false", k_phase_name[j->phase], j->percent,
         j->consumed, j->total, j->written,
-        fc_cli_backup_text(NULL) ? "true" : "false", j->error);
+        j->state[PH_BACKUP] == ST_DONE ? "true" : "false", err_esc);
 
     for (int i = 0; i < PH_COUNT && n > 0 && (size_t)n < out_len; i++) {
         static const char *const k_state[] = {
             "pending", "active", "done", "skipped", "failed",
         };
+        char detail[sizeof(j->detail[0]) * 2];
+        json_str(detail, sizeof(detail), j->detail[i]);
         n += snprintf(out + n, out_len - n, "%s{\"name\":\"%s\",\"state\":\"%s\",\"detail\":\"%s\"}",
-                      i ? "," : "", k_phase_name[i], k_state[j->state[i]], j->detail[i]);
+                      i ? "," : "", k_phase_name[i], k_state[j->state[i]], detail);
     }
     if (n > 0 && (size_t)n < out_len) {
         snprintf(out + n, out_len - n, "]}");
@@ -852,16 +891,19 @@ static esp_err_t status_get(httpd_req_t *req)
 
 static esp_err_t backup_get(httpd_req_t *req)
 {
-    size_t len = 0;
-    const char *text = fc_cli_backup_text(&len);
-    if (!text || len == 0) {
+    if (!fc_cli_backup_hold()) {
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "no backup captured");
         return ESP_FAIL;
     }
+
+    size_t len = 0;
+    const char *text = fc_cli_backup_text(&len);
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Content-Disposition",
                        "attachment; filename=\"betaflight-backup.txt\"");
-    return httpd_resp_send(req, text, len);
+    const esp_err_t err = httpd_resp_send(req, text, len);
+    fc_cli_backup_give();
+    return err;
 }
 
 static esp_err_t abort_post(httpd_req_t *req)

@@ -53,7 +53,13 @@ esp_err_t fc_cli_enter(void);
 // returns.
 esp_err_t fc_cli_backup(void);
 
-// The captured backup, or NULL. Valid until fc_cli_backup_free().
+// The captured backup, or NULL. The buffer is grown and freed by the flash
+// task while an HTTP task may be sending it, so hold it across any use:
+// fc_cli_backup_hold() blocks the flasher from moving or releasing it.
+//
+//     if (fc_cli_backup_hold()) { ... use the pointer ...; fc_cli_backup_give(); }
+bool fc_cli_backup_hold(void);
+void fc_cli_backup_give(void);
 const char *fc_cli_backup_text(size_t *len);
 void fc_cli_backup_free(void);
 

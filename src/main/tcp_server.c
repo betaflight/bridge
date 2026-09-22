@@ -95,24 +95,16 @@ static void close_client(void)
     close(fd);
 }
 
-// Adopt a freshly accepted client as the single served connection, taking the
-// bridge over from any current owner (newest connection wins). Returns false if
-// the flasher owns the FC, in which case the caller must drop the connection.
-static bool adopt_client(int fd)
+// Adopt a freshly accepted client as the single served connection. The caller
+// has already claimed the bridge, so a WebSocket owner will notice it lost
+// ownership and drop itself; we never reach across transports from here, which
+// would risk blocking an httpd worker.
+static void adopt_client(int fd)
 {
-    // Take the bridge over from any owner (incl. a WebSocket client). Its own
-    // task notices the ownership change and drops it; we do not reach across
-    // transports here, which would risk blocking the httpd worker. The one
-    // owner we cannot supersede is a firmware flash in progress.
-    if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_TCP)) {
-        ESP_LOGW(TAG, "refusing client: flashing the FC");
-        return false;
-    }
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));  // low MSP latency
     s_client = fd;
     ESP_LOGI(TAG, "client connected");
-    return true;
 }
 
 static void tcp_accept_task(void *arg)
@@ -206,9 +198,12 @@ static void tcp_accept_task(void *arg)
                 ESP_LOGW(TAG, "accept() failed: errno %d", errno);
                 continue;
             }
-            if (bridge_is_flashing()) {
+            // Claim first: dropping the current client before knowing whether
+            // this one can be served would lose both.
+            if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_TCP)) {
                 // Say why rather than dropping silently: a Configurator user
                 // who cannot connect mid-flash deserves an explanation.
+                ESP_LOGW(TAG, "refusing client: flashing the FC");
                 const char *msg = "betaflight-bridge: flashing the FC, try again shortly\r\n";
                 send(fd, msg, strlen(msg), 0);
                 close(fd);
@@ -218,9 +213,7 @@ static void tcp_accept_task(void *arg)
                 ESP_LOGI(TAG, "new client; dropping current TCP client");
                 close_client();
             }
-            if (!adopt_client(fd)) {   // claims the bridge; a WS owner drops itself
-                close(fd);
-            }
+            adopt_client(fd);   // a WS owner notices and drops itself
         }
     }
 }

@@ -139,9 +139,11 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "function fcShow(s){var h='';" \
     "s.phases.forEach(function(p){" \
     "h+='<div class=\"ph\"><span class=\"'+fcClass[p.state]+'\">'+fcGlyph[p.state]+'</span>'" \
-    "+'<span>'+(fcNames[p.name]||p.name)+'</span><span class=\"pd\">'+p.detail+'</span></div>';" \
+    "+'<span>'+(fcNames[p.name]||p.name)+'</span><span class=\"pd\"></span></div>';" \
     "if(p.state=='active')h+='<div class=\"bar\"><i style=\"width:'+s.percent+'%\"></i></div>'});" \
-    "document.getElementById('fcphases').innerHTML=h;" \
+    "var host=document.getElementById('fcphases');host.innerHTML=h;" \
+    "var pd=host.querySelectorAll('.pd');" \
+    "s.phases.forEach(function(p,i){if(pd[i])pd[i].textContent=p.detail});" \
     "if(s.backup&&!fcGot){fcGot=true;var a=document.createElement('a');" \
     "a.href='/dfu/backup';a.download='betaflight-backup.txt';document.body.appendChild(a);a.click();a.remove()}" \
     "if(!s.running){fcBusy(false);if(fcPoller){clearInterval(fcPoller);fcPoller=null}" \
@@ -348,9 +350,9 @@ static const char PAGE[] =
     "function forget(){$('msg').textContent=t('Clearing saved network...','\\u6b63\\u5728\\u6e05\\u9664\\u5df2\\u4fdd\\u5b58\\u7684\\u7f51\\u7edc...');fetch('/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='}).then(function(){$('msg').textContent=t('Stored network cleared.','\\u5df2\\u6e05\\u9664\\u5df2\\u4fdd\\u5b58\\u7684\\u7f51\\u7edc\\u3002');status();scan()})}"
     "function fileChanged(){var f=$('fw').files[0];$('file-btn').textContent=t('Choose file','\\u9009\\u62e9\\u6587\\u4ef6');$('file-name').textContent=f?f.name:t('No file selected','\\u672a\\u9009\\u62e9\\u4efb\\u4f55\\u6587\\u4ef6')}"
     "function upload(){var f=$('fw').files[0];if(!f){$('up').textContent=t('Select a .bin firmware image.','\\u8bf7\\u9009\\u62e9 .bin \\u56fa\\u4ef6\\u955c\\u50cf\\u3002');return}var x=new XMLHttpRequest();x.open('POST','/update');x.upload.onprogress=function(e){if(e.lengthComputable)$('up').textContent=t('Uploading ','\\u6b63\\u5728\\u4e0a\\u4f20 ')+Math.round(e.loaded/e.total*100)+'%'};x.onload=function(){$('up').textContent=x.status===200?t('Update complete. Rebooting...','\\u66f4\\u65b0\\u5b8c\\u6210\\uff0c\\u6b63\\u5728\\u91cd\\u542f...'):t('Update failed: ','\\u66f4\\u65b0\\u5931\\u8d25\\uff1a')+x.responseText};x.onerror=function(){$('up').textContent=t('Upload connection lost.','\\u4e0a\\u4f20\\u8fde\\u63a5\\u5df2\\u65ad\\u5f00\\u3002')};x.send(f)}"
-    "lang();fileChanged();setInterval(status,2000);"
     FLASH_CARD_JS
     TAB_JS
+    "lang();fileChanged();setInterval(status,2000);"
     "tabInit();"
     "</script></div></body></html>";
 #else
@@ -495,9 +497,9 @@ static const char PAGE[] =
     "x.onload=function(){$('up').textContent=x.status==200?'Update OK — rebooting, reconnect in ~10s.':'Update failed: '+x.responseText};"
     "x.onerror=function(){$('up').textContent='Upload connection lost.'};"
     "x.send(f)}"
-    "status();setInterval(status,2000);scan();"
     FLASH_CARD_JS
     TAB_JS
+    "status();setInterval(status,2000);scan();"
     "tabInit();"
     "</script></div></body></html>";
 #endif

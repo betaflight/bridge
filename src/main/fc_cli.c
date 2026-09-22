@@ -59,6 +59,38 @@ static const char *TAG = "fc_cli";
 static StreamBufferHandle_t s_rx;
 static char *s_backup;
 static size_t s_backup_len;
+// The capture grows the buffer with realloc and a new job frees it, both from
+// the flash task, while /dfu/backup sends it from an HTTP task.
+static SemaphoreHandle_t s_backup_lock;
+
+static void backup_lock(void)
+{
+    if (!s_backup_lock) {
+        s_backup_lock = xSemaphoreCreateMutex();
+        configASSERT(s_backup_lock);
+    }
+    xSemaphoreTake(s_backup_lock, portMAX_DELAY);
+}
+
+static void backup_unlock(void)
+{
+    xSemaphoreGive(s_backup_lock);
+}
+
+bool fc_cli_backup_hold(void)
+{
+    backup_lock();
+    if (s_backup && s_backup_len) {
+        return true;
+    }
+    backup_unlock();
+    return false;
+}
+
+void fc_cli_backup_give(void)
+{
+    backup_unlock();
+}
 
 void fc_cli_begin(void)
 {
@@ -280,9 +312,11 @@ static bool is_cli_text(uint8_t c)
 
 void fc_cli_backup_free(void)
 {
+    backup_lock();
     free(s_backup);
     s_backup = NULL;
     s_backup_len = 0;
+    backup_unlock();
 }
 
 const char *fc_cli_backup_text(size_t *len)
@@ -314,7 +348,9 @@ esp_err_t fc_cli_backup(void)
     const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(CLI_PROMPT_MS);
     while (xTaskGetTickCount() < deadline) {
         if (s_backup_len + 512 > cap) {
+            backup_lock();
             if (cap >= BACKUP_MAX) {
+                backup_unlock();
                 ESP_LOGE(TAG, "backup exceeded %d bytes", BACKUP_MAX);
                 fc_cli_backup_free();
                 return ESP_ERR_NO_MEM;
@@ -322,11 +358,13 @@ esp_err_t fc_cli_backup(void)
             const size_t want = cap * 2 > BACKUP_MAX ? BACKUP_MAX : cap * 2;
             char *grown = realloc(s_backup, want);
             if (!grown) {
+                backup_unlock();
                 fc_cli_backup_free();
                 return ESP_ERR_NO_MEM;
             }
             s_backup = grown;
             cap = want;
+            backup_unlock();
         }
 
         const size_t n = rx_read((uint8_t *)s_backup + s_backup_len,
