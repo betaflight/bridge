@@ -220,7 +220,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
         ret = httpd_ws_recv_frame(req, &frame, frame.len);
         if (ret == ESP_OK && active &&
             (frame.type == HTTPD_WS_TYPE_BINARY || frame.type == HTTPD_WS_TYPE_TEXT)) {
-            bridge_net_to_usb_push(payload, frame.len);
+            bridge_net_to_usb_push(BRIDGE_CLIENT_WS, payload, frame.len);
         }
         free(payload);
     }

@@ -143,10 +143,18 @@ size_t bridge_usb_to_net_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms)
     return n;
 }
 
-size_t bridge_net_to_usb_push(const uint8_t *data, size_t len)
+size_t bridge_net_to_usb_push(bridge_client_t who, const uint8_t *data, size_t len)
 {
-    size_t sent = xStreamBufferSend(s_net_to_usb, data, len, 0);
+    // Under s_claim_mux so the write cannot slip between a takeover's claim and
+    // its buffer reset. A caller that read these bytes while it still owned the
+    // bridge would otherwise inject them into the new owner's session.
+    xSemaphoreTake(s_claim_mux, portMAX_DELAY);
+    taskENTER_CRITICAL(&s_owner_mux);
+    const bool owns = s_owner == who;
+    taskEXIT_CRITICAL(&s_owner_mux);
+    const size_t sent = owns ? xStreamBufferSend(s_net_to_usb, data, len, 0) : 0;
     s_fc_activity += sent;
+    xSemaphoreGive(s_claim_mux);
     return sent;
 }
 

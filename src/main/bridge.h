@@ -73,9 +73,11 @@ size_t bridge_usb_to_net_push(const uint8_t *data, size_t len);
 // timeout_ms for at least one byte. Returns bytes written into out.
 size_t bridge_usb_to_net_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);
 
-// Configurator -> FC. Called from the TCP RX task. Non-blocking; returns bytes
-// queued.
-size_t bridge_net_to_usb_push(const uint8_t *data, size_t len);
+// Configurator -> FC. Called from the TCP RX task. `who` is the caller's own
+// identity: the write is dropped if the bridge has since changed hands, so bytes
+// read before a takeover cannot land in the new owner's stream. Non-blocking
+// with respect to the buffer; returns bytes queued.
+size_t bridge_net_to_usb_push(bridge_client_t who, const uint8_t *data, size_t len);
 
 // Configurator -> FC drain. Called by the USB TX task. Blocks up to timeout_ms.
 size_t bridge_net_to_usb_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);

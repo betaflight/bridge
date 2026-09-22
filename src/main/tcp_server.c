@@ -182,7 +182,7 @@ static void tcp_accept_task(void *arg)
         if (client >= 0 && FD_ISSET(client, &rfds)) {
             int n = recv(client, buf, sizeof(buf), 0);
             if (n > 0) {
-                bridge_net_to_usb_push(buf, n);
+                bridge_net_to_usb_push(BRIDGE_CLIENT_TCP, buf, n);
             } else {
                 ESP_LOGI(TAG, "client %s", n == 0 ? "closed" : "gone");
                 close_client();

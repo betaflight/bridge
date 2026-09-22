@@ -139,7 +139,7 @@ static void tx(const void *data, size_t len)
     // The FC-bound buffer can fill if the FC is slow; push what fits and retry
     // rather than dropping the tail of a command.
     for (int tries = 0; len && tries < 100; tries++) {
-        const size_t sent = bridge_net_to_usb_push(p, len);
+        const size_t sent = bridge_net_to_usb_push(BRIDGE_CLIENT_FLASH, p, len);
         p += sent;
         len -= sent;
         if (len) {
@@ -351,12 +351,10 @@ esp_err_t fc_cli_backup(void)
 
     const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(CLI_PROMPT_MS);
     while (xTaskGetTickCount() < deadline) {
-        if (len + 512 > cap) {
-            if (cap >= BACKUP_MAX) {
-                ESP_LOGE(TAG, "backup exceeded %d bytes", BACKUP_MAX);
-                free(buf);
-                return ESP_ERR_NO_MEM;
-            }
+        // Keep a chunk of headroom so each read can take a decent bite, but
+        // only give up once the buffer is genuinely full: the last fragment of
+        // a dump plus the "# " prompt can be far smaller than the headroom.
+        if (len + 512 > cap && cap < BACKUP_MAX) {
             const size_t want = cap * 2 > BACKUP_MAX ? BACKUP_MAX : cap * 2;
             char *grown = realloc(buf, want);
             if (!grown) {
@@ -365,6 +363,11 @@ esp_err_t fc_cli_backup(void)
             }
             buf = grown;
             cap = want;
+        }
+        if (len + 1 >= cap) {
+            ESP_LOGE(TAG, "backup exceeded %d bytes", BACKUP_MAX);
+            free(buf);
+            return ESP_ERR_NO_MEM;
         }
 
         const size_t n = rx_read((uint8_t *)buf + len, cap - len - 1, 500);

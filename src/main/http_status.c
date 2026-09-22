@@ -108,7 +108,7 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "body.light #fcphases:not(:empty){border-top-color:#e5e8ec}"
 
 #define FLASH_CARD_HTML \
-    "<div class=\"card\"><h2>Flash flight controller</h2>" \
+    "<div class=\"card\" id=\"fccard\"><h2>Flash flight controller</h2>" \
     "<input type=\"file\" id=\"fcfw\" accept=\".hex\">" \
     "<div class=\"opts\">" \
     "<label class=\"opt\"><input type=\"checkbox\" id=\"fcbackup\" checked>Back up config</label>" \
@@ -128,6 +128,7 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
 // in RAM and a reboot would take it along.
 #define FLASH_CARD_JS \
     "var fcPoller=null,fcGot=false,fcSlice=16384;" \
+    "function fcT(a,b){return typeof zh!=='undefined'&&zh?b:a}" \
     "var fcNames={backup:'Back up config',bootloader:'Reboot to bootloader',probe:'Identify target'," \
     "erase:'Erase',write:'Write',verify:'Verify',finish:'Start firmware',restore:'Restore backup'};" \
     "var fcGlyph={pending:'\\u00b7',active:'\\u25d0',done:'\\u2713',skipped:'\\u2013',failed:'\\u2717'};" \
@@ -136,6 +137,15 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "function fcSay(m){document.getElementById('fcmsg').textContent=m||''}" \
     "function fcBusy(b){document.getElementById('fcgo').style.display=b?'none':'';" \
     "document.getElementById('fcstop').style.display=b?'':'none'}" \
+    "function fcLang(){var n=fcT(['Back up config','Reboot to bootloader','Identify target','Erase','Write','Verify','Start firmware','Restore backup'],['\\u5907\\u4efd\\u914d\\u7f6e','\\u91cd\\u542f\\u8fdb\\u5165\\u5f15\\u5bfc\\u7a0b\\u5e8f','\\u8bc6\\u522b\\u76ee\\u6807','\\u64e6\\u9664','\\u5199\\u5165','\\u6821\\u9a8c','\\u542f\\u52a8\\u56fa\\u4ef6','\\u6062\\u590d\\u5907\\u4efd']);" \
+    "fcNames={backup:n[0],bootloader:n[1],probe:n[2],erase:n[3]," \
+    "write:n[4],verify:n[5],finish:n[6],restore:n[7]};" \
+    "var c=document.getElementById('fccard');if(!c)return;" \
+    "c.querySelector('h2').textContent=fcT('Flash flight controller','\\u5237\\u5199\\u98de\\u63a7');" \
+    "var o=c.querySelectorAll('.opt'),ot=fcT(['Back up config','Full chip erase','Verify','Restore backup'],['\\u5907\\u4efd\\u914d\\u7f6e','\\u5168\\u7247\\u64e6\\u9664','\\u6821\\u9a8c','\\u6062\\u590d\\u5907\\u4efd']);" \
+    "ot.forEach(function(v,i){if(o[i])o[i].lastChild.textContent=v});" \
+    "document.getElementById('fcgo').textContent=fcT('Flash flight controller','\\u5237\\u5199\\u98de\\u63a7');" \
+    "document.getElementById('fcstop').textContent=fcT('Abort','\\u4e2d\\u6b62')}" \
     "function fcShow(s){var h='';" \
     "s.phases.forEach(function(p){" \
     "h+='<div class=\"ph\"><span class=\"'+fcClass[p.state]+'\">'+fcGlyph[p.state]+'</span>'" \
@@ -147,7 +157,7 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "if(s.backup&&!fcGot){fcGot=true;var a=document.createElement('a');" \
     "a.href='/dfu/backup';a.download='betaflight-backup.txt';document.body.appendChild(a);a.click();a.remove()}" \
     "if(!s.running){fcBusy(false);if(fcPoller){clearInterval(fcPoller);fcPoller=null}" \
-    "fcSay(s.error?'Failed: '+s.error:'Done.')}}" \
+    "fcSay(s.error?fcT('Failed: ','\\u5931\\u8d25\\uff1a')+s.error:fcT('Done.','\\u5b8c\\u6210\\u3002'))}}" \
     "function fcPoll(){if(fcPoller)return;fcPoller=setInterval(function(){" \
     "fetch('/dfu/status').then(function(r){return r.json()}).then(fcShow).catch(function(){})},700)}" \
     "function fcFail(r){return r.text().then(function(t){throw new Error(t||('HTTP '+r.status))})}" \
@@ -157,17 +167,17 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "if(w&&w.state==='active'){fcSend(f,0);return}" \
     "setTimeout(function(){fcWait(f)},600)}).catch(function(){setTimeout(function(){fcWait(f)},1000)})}" \
     "function fcSend(f,off){" \
-    "if(off>=f.size){fcSay('Upload complete, finishing...');fcPoll();return}" \
+    "if(off>=f.size){fcSay(fcT('Upload complete, finishing...','\\u4e0a\\u4f20\\u5b8c\\u6210\\uff0c\\u6b63\\u5728\\u6536\\u5c3e...'));fcPoll();return}" \
     "var end=Math.min(off+fcSlice,f.size);" \
     "f.slice(off,end).arrayBuffer().then(function(b){" \
     "return fetch('/dfu/data',{method:'POST',body:b})}).then(function(r){" \
     "return r.ok?r.json():fcFail(r)}).then(function(s){fcShow(s);fcSend(f,end)})" \
-    ".catch(function(e){fcSay(e.message)})}" \
+    ".catch(function(e){fcSay(e.message);fcPoll()})}" \
     "function fcFlash(){var f=document.getElementById('fcfw').files[0];" \
-    "if(!f){fcSay('Pick a .hex file.');return}" \
-    "if(!/\\.hex$/i.test(f.name)){fcSay('Only .hex is supported for now.');return}" \
-    "if(!confirm('Flash '+f.name+' to the connected FC?'))return;" \
-    "fcGot=false;fcBusy(true);fcSay('Starting...');" \
+    "if(!f){fcSay(fcT('Pick a .hex file.','\\u8bf7\\u9009\\u62e9 .hex \\u6587\\u4ef6\\u3002'));return}" \
+    "if(!/\\.hex$/i.test(f.name)){fcSay(fcT('Only .hex is supported for now.','\\u76ee\\u524d\\u4ec5\\u652f\\u6301 .hex \\u6587\\u4ef6\\u3002'));return}" \
+    "if(!confirm(fcT('Flash '+f.name+' to the connected FC?','\\u786e\\u5b9a\\u5c06 '+f.name+' \\u5237\\u5199\\u5230\\u5df2\\u8fde\\u63a5\\u7684\\u98de\\u63a7\\uff1f')))return;" \
+    "fcGot=false;fcBusy(true);fcSay(fcT('Starting...','\\u6b63\\u5728\\u542f\\u52a8...'));" \
     "fetch('/dfu/start',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'}," \
     "body:'size='+f.size+'&backup='+fcOpt('fcbackup')+'&erase_all='+fcOpt('fcerase')" \
     "+'&verify='+fcOpt('fcverify')+'&restore='+fcOpt('fcrestore')})" \
@@ -342,7 +352,7 @@ static const char PAGE[] =
     "function t(a,b){return zh?b:a}function put(id,text,kind){var e=$(id);e.className=(id==='ip'||id==='url'||id==='gw'||id==='mask'||id==='board'||id==='slot'?'mono ':'')+(kind||'');e.textContent=text}"
     "function theme(){document.body.classList.toggle('light',light);$('theme').textContent=light?'\\u263e':'\\u2600';$('theme').title=light?t('Dark theme','\\u6df1\\u8272\\u6a21\\u5f0f'):t('Light theme','\\u4eae\\u8272\\u6a21\\u5f0f');localStorage.bridgeTheme=light?'light':'dark'}"
     "function toggleTheme(){light=!light;theme()}function toggleLang(){zh=!zh;localStorage.bridgeLang=zh?'zh':'en';lang();fileChanged()}"
-    "function lang(){var k=t(['FC (USB VCP)','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','Network','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','\\u7f51\\u7edc','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';theme();scan();status()}"
+    "function lang(){var k=t(['FC (USB VCP)','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','Network','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','\\u7f51\\u7edc','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';fcLang();theme();scan();status()}"
     "function pick(){$('manualwrap').style.display=$('ssid').value==='__manual__'?'block':'none'}function bars(r){return r>=-55?'\\u2588':r>=-67?'\\u2586':r>=-78?'\\u2584':'\\u2582'}"
     "function status(){fetch('/status').then(function(r){return r.json()}).then(function(s){put('usb',s.usb.dfu?t('BOOTLOADER ','\\u5f15\\u5bfc\\u7a0b\\u5e8f ')+s.usb.dfuid:s.usb.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+s.usb.id:t('WAITING','\\u7b49\\u5f85\\u4e2d'),s.usb.dfu?'warn':s.usb.up?'up':'down');var v=s.tcp.via==='tcp'?'TCP :'+s.tcp.port:s.tcp.via==='wss'?'WSS':'WS';put('tcp',s.tcp.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+v:t('NONE','\\u65e0'),s.tcp.up?'up':'down');var w=s.wifi;put('sta',w.state==='connected'?w.ssid:w.state==='connecting'?t('CONNECTING','\\u6b63\\u5728\\u8fde\\u63a5'):w.state==='failed'?t('FAILED ','\\u8fde\\u63a5\\u5931\\u8d25 ')+w.ssid:t('NONE','\\u65e0'),w.state==='connected'?'up':w.state==='idle'?'down':'warn');put('rssi',w.state==='connected'&&w.rssi?bars(w.rssi)+' '+w.rssi+' dBm':'-',w.state==='connected'?(w.rssi>=-60?'up':'warn'):'down');put('ip',w.ip||'-',w.ip?'':'down');put('url',w.ip?'wss://'+w.ip+'/serial':'-',w.ip?'':'down');put('gw',w.gw||'-',w.gw?'':'down');put('mask',w.netmask||'-',w.netmask?'':'down');put('ap',w.ap?t('SETUP MODE','\\u914d\\u7f6e\\u6a21\\u5f0f'):t('OFF','\\u5173\\u95ed'),w.ap?'warn':'down');put('board',s.ota.board);put('slot',s.ota.slot+' '+(s.ota.valid?t('VALID','\\u6709\\u6548'):t('PENDING','\\u7b49\\u9a8c\\u8bc1')),s.ota.valid?'up':'warn')}).catch(function(){})}"
     "function scan(){var s=$('ssid');s.innerHTML='<option>'+t('Scanning...','\\u626b\\u63cf\\u4e2d...')+'</option>';fetch('/scan').then(function(r){return r.json()}).then(function(l){var o='<option value=\\\"\\\">'+t('Select a network','\\u8bf7\\u9009\\u62e9\\u7f51\\u7edc')+'</option>';l.forEach(function(x){o+='<option value=\\\"'+x.ssid.replace(/\\\"/g,'&quot;')+'\\\">'+bars(x.rssi)+' '+x.ssid+(x.secure?' \\uD83D\\uDD12':'')+'</option>'});s.innerHTML=o+'<option value=\\\"__manual__\\\">'+t('Other network','\\u5176\\u4ed6\\u7f51\\u7edc')+'</option>';pick()}).catch(function(){s.innerHTML='<option>'+t('Scan failed','\\u626b\\u63cf\\u5931\\u8d25')+'</option>'})}"
@@ -601,7 +611,8 @@ static esp_err_t status_get(httpd_req_t *req)
         "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}}",
         usb ? "true" : "false", vid, pid,
         in_dfu ? "true" : "false", in_dfu ? dfu.vid : 0, in_dfu ? dfu.pid : 0,
-        owner != BRIDGE_CLIENT_NONE ? "true" : "false", via, TCP_SERVER_PORT,
+        (owner == BRIDGE_CLIENT_TCP || owner == BRIDGE_CLIENT_WS) ? "true" : "false",
+        via, TCP_SERVER_PORT,
         state, w.ap_active ? "true" : "false", ssid_esc, bridge_mdns_hostname(),
         w.ip, w.gw, w.netmask, w.rssi,
         ota_board_id(), slot, img_valid ? "true" : "false");
