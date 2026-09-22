@@ -30,9 +30,14 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 | `src/main/tls_cert.c` | Self-signed TLS cert generated on first boot, persisted in NVS |
 | `src/main/bridge_mdns.c` | mDNS responder: `betaflight-bridge-<mac>.local`, `_betaflight._tcp` service |
 | `src/main/wifi.c` | Station-first WiFi: joins a stored network, SoftAP fallback, creds in NVS |
-| `src/main/http_status.c` | Web UI on 80 (HTTP) and 443 (HTTPS): status + scan/join + firmware upload + `/serial` |
+| `src/main/http_status.c` | Web UI on 80 (HTTP) and 443 (HTTPS): status + scan/join + firmware upload + FC flashing + `/serial` |
 | `src/main/ota.c` | `POST /update` OTA handler; streams an uploaded .bin into the spare slot |
-| `src/main/bridge.c` | Two stream buffers decoupling USB and network; single-client arbiter (TCP vs WS) |
+| `src/main/bridge.c` | Two stream buffers decoupling USB and network; single-client arbiter (TCP vs WS vs flasher) |
+| `src/main/fc_flash.c` | Flashes the FC: job state machine, phase progress, the `/dfu/*` routes |
+| `src/main/dfu_host.c` | Second USB host client; DFU 1.1 + STM32 DfuSe over EP0 |
+| `src/main/dfu_layout.c` | Parses the bootloader's memory layout out of its interface strings |
+| `src/main/hex_parser.c` | Streaming Intel HEX reader; never holds the whole image |
+| `src/main/fc_cli.c` | MSP reboot and CLI `diff all` backup / restore, over the byte bridge |
 | `boards/<board>/` | Per-board component: flash size, partition table, PSRAM, identity and any board-specific hardware |
 | `esp-idf/` | Pinned ESP-IDF (git submodule, `release/v5.4`, shallow) |
 
@@ -378,6 +383,58 @@ on the status page.
 > The partition table only takes effect from a flash over the wire, so the first
 > flash — `idf.py flash` or the factory image from a browser — is the last one
 > that needs the cable.
+
+## Flashing the flight controller
+
+The **Flash flight controller** card on the web page flashes the FC itself over
+USB DFU — no cable, no Configurator. Pick a Betaflight `.hex`, choose the
+options, and the bridge does the rest:
+
+| Phase | What happens |
+| --- | --- |
+| Back up config | Enters the CLI and captures `diff all` |
+| Reboot to bootloader | CLI `bl`, then waits for the FC to reappear as a DFU device |
+| Identify target | Reads the memory layout and transfer size from the bootloader |
+| Erase | Every page, or just the ones the image touches |
+| Write | Streams the hex straight to flash |
+| Verify | Reads it all back and compares |
+| Start firmware | Leaves DFU |
+| Restore backup | Replays the saved config and saves it |
+
+Each phase reports its own progress, and a failure marks the phase it happened
+in rather than a generic error.
+
+**The backup matters.** On targets like the H743 the config sector sits inside
+the flashed range, so every DFU flash wipes the configuration. Leave *Back up
+config* ticked; the page downloads the capture to your browser as soon as it
+exists, because the bridge only holds it in RAM. *Restore backup* replays it
+once the new firmware has booted.
+
+Flashing takes the FC exclusively: a connected Configurator is dropped and new
+connections are refused, with a reason, until it finishes.
+
+Only Intel HEX is supported today. `.bin` and `.uf2`, and flashing boards whose
+bootloader presents as mass storage rather than DFU, are not implemented yet.
+
+If the FC is already sitting in its bootloader the backup and reboot phases are
+skipped, so a board left in DFU by a failed attempt can simply be flashed again.
+A failure leaves it in DFU and recoverable — no power cycle needed.
+
+### Endpoints
+
+Driven by the page, but usable directly:
+
+| Route | Purpose |
+| --- | --- |
+| `POST /dfu/start` | Begin a job. Form-encoded `size`, `backup`, `erase_all`, `verify`, `restore`. 409 if one is already running |
+| `POST /dfu/data` | The next slice of the hex; returns the progress snapshot |
+| `GET /dfu/status` | Progress snapshot as JSON |
+| `GET /dfu/backup` | The captured `diff all`, as text |
+| `POST /dfu/abort` | Cancel the running job |
+
+The image is never buffered whole — the 4 MB boards have neither a spare
+partition nor the PSRAM for it — so the browser uploads it in slices and TCP
+backpressure paces the upload to whatever speed the FC's flash can take.
 
 ## Notes
 

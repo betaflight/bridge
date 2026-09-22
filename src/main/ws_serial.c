@@ -22,6 +22,7 @@
 #include "ws_serial.h"
 #include "bridge.h"
 #include "tcp_server.h"
+#include "fc_cli.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +136,12 @@ static void net_tx_task(void *arg)
         case BRIDGE_CLIENT_WS:
             ws_send(buf, n);
             break;
+        case BRIDGE_CLIENT_FLASH:
+            // The flasher is talking to the FC's CLI. This stays the single
+            // consumer of the buffer - a second pump would race this one and
+            // misroute replies.
+            fc_cli_rx(buf, n);
+            break;
         default:
             break;   // no owner: discard
         }
@@ -144,6 +151,16 @@ static void net_tx_task(void *arg)
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
+        // A flash in progress owns the FC outright. Refuse before touching any
+        // of the session state below, so the existing client is left alone.
+        if (bridge_is_flashing()) {
+            ESP_LOGW(TAG, "refusing client: flashing the FC");
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_set_type(req, "text/plain");
+            httpd_resp_sendstr(req, "flashing the FC, try again shortly");
+            return ESP_FAIL;
+        }
+
         // WebSocket handshake. The newest client wins, whatever transport the
         // current one is on (so a reconnect isn't locked out by a stale,
         // half-closed session).
@@ -170,8 +187,10 @@ static esp_err_t ws_handler(httpd_req_t *req)
         }
         // Take the bridge over from any owner (incl. a TCP client). Its own task
         // notices the ownership change and drops it; we do not reach across
-        // transports here, which would risk blocking the httpd worker.
-        bridge_claim(BRIDGE_CLIENT_WS);
+        // transports here, which would risk blocking the httpd worker. If a
+        // flash started since the check above, leave it owning: this client
+        // simply gets no data until the flash finishes and it reconnects.
+        bridge_claim_unless_flashing(BRIDGE_CLIENT_WS);
         s_secure = (req->user_ctx != NULL);   // set per-server at registration
         ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;

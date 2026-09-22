@@ -96,17 +96,23 @@ static void close_client(void)
 }
 
 // Adopt a freshly accepted client as the single served connection, taking the
-// bridge over from any current owner (newest connection wins).
-static void adopt_client(int fd)
+// bridge over from any current owner (newest connection wins). Returns false if
+// the flasher owns the FC, in which case the caller must drop the connection.
+static bool adopt_client(int fd)
 {
+    // Take the bridge over from any owner (incl. a WebSocket client). Its own
+    // task notices the ownership change and drops it; we do not reach across
+    // transports here, which would risk blocking the httpd worker. The one
+    // owner we cannot supersede is a firmware flash in progress.
+    if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_TCP)) {
+        ESP_LOGW(TAG, "refusing client: flashing the FC");
+        return false;
+    }
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));  // low MSP latency
     s_client = fd;
-    // Take the bridge over from any owner (incl. a WebSocket client). Its own
-    // task notices the ownership change and drops it; we do not reach across
-    // transports here, which would risk blocking the httpd worker.
-    bridge_claim(BRIDGE_CLIENT_TCP);
     ESP_LOGI(TAG, "client connected");
+    return true;
 }
 
 static void tcp_accept_task(void *arg)
@@ -200,11 +206,21 @@ static void tcp_accept_task(void *arg)
                 ESP_LOGW(TAG, "accept() failed: errno %d", errno);
                 continue;
             }
+            if (bridge_is_flashing()) {
+                // Say why rather than dropping silently: a Configurator user
+                // who cannot connect mid-flash deserves an explanation.
+                const char *msg = "betaflight-bridge: flashing the FC, try again shortly\r\n";
+                send(fd, msg, strlen(msg), 0);
+                close(fd);
+                continue;
+            }
             if (s_client >= 0) {
                 ESP_LOGI(TAG, "new client; dropping current TCP client");
                 close_client();
             }
-            adopt_client(fd);   // claims the bridge; a WS owner drops itself
+            if (!adopt_client(fd)) {   // claims the bridge; a WS owner drops itself
+                close(fd);
+            }
         }
     }
 }

@@ -40,12 +40,23 @@ typedef enum {
     BRIDGE_CLIENT_NONE = 0,
     BRIDGE_CLIENT_TCP,
     BRIDGE_CLIENT_WS,
+    BRIDGE_CLIENT_FLASH,   // the firmware flasher, which locks the others out
 } bridge_client_t;
 
 // Claim the FC stream for `who`, taking it over from any current owner (newest
 // client wins). The buffers are reset; the caller must bridge_release() when its
 // client goes away, but only while it still owns (see bridge_client_owner()).
 void bridge_claim(bridge_client_t who);
+
+// As bridge_claim(), but refuses when the flasher holds the stream: reflashing
+// the FC must not be interrupted by someone opening Configurator. Returns false
+// without claiming in that case. The test and the claim are atomic, so a
+// connection cannot slip in between a flash starting and the check.
+bool bridge_claim_unless_flashing(bridge_client_t who);
+
+// True while the flasher owns the stream. For status reporting only; use
+// bridge_claim_unless_flashing() to arbitrate.
+bool bridge_is_flashing(void);
 
 // Release a claim previously taken by `who` (no-op if `who` is not the owner).
 void bridge_release(bridge_client_t who);

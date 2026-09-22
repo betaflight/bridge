@@ -77,6 +77,26 @@ void bridge_claim(bridge_client_t who)
     bridge_reset();   // fresh session: drop any stale MSP bytes
 }
 
+bool bridge_claim_unless_flashing(bridge_client_t who)
+{
+    bool claimed;
+    taskENTER_CRITICAL(&s_owner_mux);
+    claimed = (s_owner != BRIDGE_CLIENT_FLASH);
+    if (claimed) {
+        s_owner = who;
+    }
+    taskEXIT_CRITICAL(&s_owner_mux);
+    if (claimed) {
+        bridge_reset();
+    }
+    return claimed;
+}
+
+bool bridge_is_flashing(void)
+{
+    return s_owner == BRIDGE_CLIENT_FLASH;
+}
+
 void bridge_release(bridge_client_t who)
 {
     taskENTER_CRITICAL(&s_owner_mux);
