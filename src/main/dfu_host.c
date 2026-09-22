@@ -766,8 +766,10 @@ void dfu_host_start(void)
     };
     ESP_ERROR_CHECK(usb_host_client_register(&cfg, &s_client));
 
-    xTaskCreate(dfu_evt_task, "dfu_evt", 4096, NULL, 9, NULL);
-    xTaskCreate(dfu_ctl_task, "dfu_ctl", 5120, NULL, 6, NULL);
+    BaseType_t ok = xTaskCreate(dfu_evt_task, "dfu_evt", 4096, NULL, 9, NULL);
+    configASSERT(ok == pdTRUE);
+    ok = xTaskCreate(dfu_ctl_task, "dfu_ctl", 5120, NULL, 6, NULL);
+    configASSERT(ok == pdTRUE);
 
     // A device attached before the client registered produces no NEW_DEV event,
     // so sweep what is already enumerated. adopt() ignores duplicates.
