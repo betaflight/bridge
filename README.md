@@ -215,7 +215,7 @@ image is the app alone, which is what the OTA endpoint expects.
 
 The `-<version>` suffix comes from `src/main/version.h` and is the same string
 the firmware reports in the web UI; `make version` prints it. Examples below
-use `2026.6.0` in place of the version.
+use `2026.9.1` in place of the version.
 
 ### Versioning and releases
 
@@ -279,7 +279,7 @@ Or, with esptool installed locally:
 
 ```sh
 esptool.py --chip esp32s3 write_flash 0x0 \
-    betaflight-bridge-esp32s3-wroom-freenove-2026.6.0-factory.bin
+    betaflight-bridge-esp32s3-wroom-freenove-2026.9.1-factory.bin
 ```
 
 Afterwards the board is updated over WiFi — see [Updating](#updating-ota).
