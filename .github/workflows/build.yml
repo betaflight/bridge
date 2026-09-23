@@ -37,14 +37,26 @@ jobs:
         with:
           submodules: false
 
-      # The pinned ESP-IDF is a submodule; fetch it shallowly so install.sh can
-      # provision the matching toolchain.
-      - name: Fetch pinned ESP-IDF
-        run: git submodule update --init --depth 1 esp-idf
-
       - name: ESP-IDF revision
         id: idf
-        run: echo "sha=$(git -C esp-idf rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "sha=$(git rev-parse HEAD:esp-idf)" >> "$GITHUB_OUTPUT"
+
+      # The IDF's own component submodules are ~20 more clones; cache the whole
+      # checkout, git dirs included, so a warm run fetches nothing.
+      - name: Cache ESP-IDF checkout
+        id: idf-src
+        uses: actions/cache@v6
+        with:
+          path: |
+            esp-idf
+            .git/modules/esp-idf
+          key: esp-idf-src-${{ steps.idf.outputs.sha }}
+
+      - name: Fetch pinned ESP-IDF
+        if: steps.idf-src.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --depth 1 esp-idf
+          git -C esp-idf submodule update --init --depth 1 --recursive
 
       # Cache the installed toolchain (~/.espressif) keyed on the pinned IDF, so
       # install.sh becomes a near-instant no-op on subsequent runs.
