@@ -32,10 +32,10 @@
 #define BRIDGE_VERSION_YEAR   2026
 #define BRIDGE_VERSION_MONTH  9
 // 1 for the first YEAR.MONTH release, then up for each bug-fix release.
-#define BRIDGE_VERSION_PATCH  1
+#define BRIDGE_VERSION_PATCH  2
 // Pre-release marker, written with its leading dash (e.g. "-rc1"). Empty
 // string for a final release.
-#define BRIDGE_VERSION_SUFFIX ""
+#define BRIDGE_VERSION_SUFFIX "-alpha"
 
 #define BRIDGE_VERSION_STR_(x) #x
 #define BRIDGE_VERSION_STR(x)  BRIDGE_VERSION_STR_(x)
