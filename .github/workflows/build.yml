@@ -13,7 +13,7 @@ jobs:
     outputs:
       boards: ${{ steps.list.outputs.boards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: false
       - id: list
@@ -33,7 +33,7 @@ jobs:
       matrix:
         board: ${{ fromJson(needs.discover.outputs.boards) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: false
 
@@ -49,7 +49,7 @@ jobs:
       # Cache the installed toolchain (~/.espressif) keyed on the pinned IDF, so
       # install.sh becomes a near-instant no-op on subsequent runs.
       - name: Cache ESP-IDF tools
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.espressif
           key: esp-tools-${{ runner.os }}-${{ steps.idf.outputs.sha }}-esp32s3
@@ -58,7 +58,7 @@ jobs:
       # each board declares its own dependencies, so the component set differs
       # per board and the board's own manifest has to be part of the key.
       - name: Cache managed components
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: managed_components
           key: managed-${{ runner.os }}-${{ matrix.board }}-${{ hashFiles('src/main/idf_component.yml', format('boards/{0}/idf_component.yml', matrix.board)) }}
@@ -74,7 +74,7 @@ jobs:
           make ${{ matrix.board }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: betaflight-bridge-${{ matrix.board }}
           path: dist/betaflight-bridge-${{ matrix.board }}-*.bin
