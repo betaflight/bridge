@@ -21,6 +21,7 @@
 
 #include "usb_cdc_host.h"
 #include "bridge.h"
+#include "dfu_host.h"
 
 #include <string.h>
 
@@ -126,7 +127,12 @@ static void usb_tx_task(void *arg)
 static void usb_connect_task(void *arg)
 {
     const cdc_acm_host_device_config_t dev_cfg = {
-        .connection_timeout_ms = 1000,
+        // Short, because this is a poll: cdc_acm_host_open() spins internally
+        // for this long per VID/PID, and the list has a dozen entries. A long
+        // timeout turns a sweep into seconds of open/close churn whenever the
+        // attached device is not a VCP - which is exactly the case while the FC
+        // sits in its DFU bootloader.
+        .connection_timeout_ms = 150,
         .out_buffer_size = 512,
         .in_buffer_size = 512,
         .user_arg = NULL,
@@ -135,6 +141,13 @@ static void usb_connect_task(void *arg)
     };
 
     while (1) {
+        // The FC is in its bootloader and belongs to the DFU client; probing it
+        // for a VCP would only burn CPU and fight for the device.
+        if (dfu_host_is_present()) {
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
         bool opened = false;
         for (size_t i = 0; i < VCP_ID_COUNT; i++) {
             esp_err_t err = cdc_acm_host_open(k_vcp_ids[i].vid, k_vcp_ids[i].pid,
@@ -188,6 +201,9 @@ void usb_cdc_host_start(void)
 
     xTaskCreate(usb_tx_task, "usb_tx", 4096, NULL, 6, NULL);
     xTaskCreate(usb_connect_task, "usb_connect", 4096, NULL, 5, NULL);
+
+    // Second host client, for when the FC re-enumerates as a DFU device.
+    dfu_host_start();
 
     ESP_LOGI(TAG, "USB host started; waiting for FC VCP");
 }

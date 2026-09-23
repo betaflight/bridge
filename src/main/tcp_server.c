@@ -95,17 +95,15 @@ static void close_client(void)
     close(fd);
 }
 
-// Adopt a freshly accepted client as the single served connection, taking the
-// bridge over from any current owner (newest connection wins).
+// Adopt a freshly accepted client as the single served connection. The caller
+// has already claimed the bridge, so a WebSocket owner will notice it lost
+// ownership and drop itself; we never reach across transports from here, which
+// would risk blocking an httpd worker.
 static void adopt_client(int fd)
 {
     int one = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));  // low MSP latency
     s_client = fd;
-    // Take the bridge over from any owner (incl. a WebSocket client). Its own
-    // task notices the ownership change and drops it; we do not reach across
-    // transports here, which would risk blocking the httpd worker.
-    bridge_claim(BRIDGE_CLIENT_TCP);
     ESP_LOGI(TAG, "client connected");
 }
 
@@ -184,7 +182,7 @@ static void tcp_accept_task(void *arg)
         if (client >= 0 && FD_ISSET(client, &rfds)) {
             int n = recv(client, buf, sizeof(buf), 0);
             if (n > 0) {
-                bridge_net_to_usb_push(buf, n);
+                bridge_net_to_usb_push(BRIDGE_CLIENT_TCP, buf, n);
             } else {
                 ESP_LOGI(TAG, "client %s", n == 0 ? "closed" : "gone");
                 close_client();
@@ -200,11 +198,26 @@ static void tcp_accept_task(void *arg)
                 ESP_LOGW(TAG, "accept() failed: errno %d", errno);
                 continue;
             }
-            if (s_client >= 0) {
-                ESP_LOGI(TAG, "new client; dropping current TCP client");
-                close_client();
+            // Claim first: dropping the current client before knowing whether
+            // this one can be served would lose both.
+            if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_TCP)) {
+                // Say why rather than dropping silently: a Configurator user
+                // who cannot connect mid-flash deserves an explanation.
+                ESP_LOGW(TAG, "refusing client: flashing the FC");
+                const char *msg = "betaflight-bridge: flashing the FC, try again shortly\r\n";
+                send(fd, msg, strlen(msg), 0);
+                close(fd);
+                continue;
             }
-            adopt_client(fd);   // claims the bridge; a WS owner drops itself
+            // Adopt before dropping the predecessor: close_client() releases
+            // the claim whenever TCP owns the bridge, which would undo the one
+            // just taken for this socket.
+            const int prev = s_client;
+            adopt_client(fd);   // a WS owner notices and drops itself
+            if (prev >= 0) {
+                ESP_LOGI(TAG, "new client; dropped the previous TCP client");
+                close(prev);
+            }
         }
     }
 }

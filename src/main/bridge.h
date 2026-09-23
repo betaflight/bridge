@@ -40,12 +40,23 @@ typedef enum {
     BRIDGE_CLIENT_NONE = 0,
     BRIDGE_CLIENT_TCP,
     BRIDGE_CLIENT_WS,
+    BRIDGE_CLIENT_FLASH,   // the firmware flasher, which locks the others out
 } bridge_client_t;
 
 // Claim the FC stream for `who`, taking it over from any current owner (newest
 // client wins). The buffers are reset; the caller must bridge_release() when its
 // client goes away, but only while it still owns (see bridge_client_owner()).
 void bridge_claim(bridge_client_t who);
+
+// As bridge_claim(), but refuses when the flasher holds the stream: reflashing
+// the FC must not be interrupted by someone opening Configurator. Returns false
+// without claiming in that case. The test and the claim are atomic, so a
+// connection cannot slip in between a flash starting and the check.
+bool bridge_claim_unless_flashing(bridge_client_t who);
+
+// True while the flasher owns the stream. For status reporting only; use
+// bridge_claim_unless_flashing() to arbitrate.
+bool bridge_is_flashing(void);
 
 // Release a claim previously taken by `who` (no-op if `who` is not the owner).
 void bridge_release(bridge_client_t who);
@@ -62,9 +73,11 @@ size_t bridge_usb_to_net_push(const uint8_t *data, size_t len);
 // timeout_ms for at least one byte. Returns bytes written into out.
 size_t bridge_usb_to_net_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);
 
-// Configurator -> FC. Called from the TCP RX task. Non-blocking; returns bytes
-// queued.
-size_t bridge_net_to_usb_push(const uint8_t *data, size_t len);
+// Configurator -> FC. Called from the TCP RX task. `who` is the caller's own
+// identity: the write is dropped if the bridge has since changed hands, so bytes
+// read before a takeover cannot land in the new owner's stream. Non-blocking
+// with respect to the buffer; returns bytes queued.
+size_t bridge_net_to_usb_push(bridge_client_t who, const uint8_t *data, size_t len);
 
 // Configurator -> FC drain. Called by the USB TX task. Blocks up to timeout_ms.
 size_t bridge_net_to_usb_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);

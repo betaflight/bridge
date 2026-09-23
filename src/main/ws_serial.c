@@ -22,6 +22,7 @@
 #include "ws_serial.h"
 #include "bridge.h"
 #include "tcp_server.h"
+#include "fc_cli.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -135,6 +136,12 @@ static void net_tx_task(void *arg)
         case BRIDGE_CLIENT_WS:
             ws_send(buf, n);
             break;
+        case BRIDGE_CLIENT_FLASH:
+            // The flasher is talking to the FC's CLI. This stays the single
+            // consumer of the buffer - a second pump would race this one and
+            // misroute replies.
+            fc_cli_rx(buf, n);
+            break;
         default:
             break;   // no owner: discard
         }
@@ -144,6 +151,17 @@ static void net_tx_task(void *arg)
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
+        // A flash in progress owns the FC outright. Claim before touching any
+        // of the session state below, so a refusal leaves the existing client
+        // alone and a flash starting mid-handshake cannot be missed.
+        if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_WS)) {
+            ESP_LOGW(TAG, "refusing client: flashing the FC");
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_set_type(req, "text/plain");
+            httpd_resp_sendstr(req, "flashing the FC, try again shortly");
+            return ESP_FAIL;
+        }
+
         // WebSocket handshake. The newest client wins, whatever transport the
         // current one is on (so a reconnect isn't locked out by a stale,
         // half-closed session).
@@ -168,10 +186,6 @@ static esp_err_t ws_handler(httpd_req_t *req)
             ESP_LOGI(TAG, "new client; dropping current WebSocket client");
             httpd_sess_trigger_close(prev_hd, prev_fd);
         }
-        // Take the bridge over from any owner (incl. a TCP client). Its own task
-        // notices the ownership change and drops it; we do not reach across
-        // transports here, which would risk blocking the httpd worker.
-        bridge_claim(BRIDGE_CLIENT_WS);
         s_secure = (req->user_ctx != NULL);   // set per-server at registration
         ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
         return ESP_OK;
@@ -206,7 +220,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
         ret = httpd_ws_recv_frame(req, &frame, frame.len);
         if (ret == ESP_OK && active &&
             (frame.type == HTTPD_WS_TYPE_BINARY || frame.type == HTTPD_WS_TYPE_TEXT)) {
-            bridge_net_to_usb_push(payload, frame.len);
+            bridge_net_to_usb_push(BRIDGE_CLIENT_WS, payload, frame.len);
         }
         free(payload);
     }
