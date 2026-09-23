@@ -73,18 +73,18 @@ extern const char icon_svg_end[]   asm("_binary_icon_svg_end");
     "body.light .tabs{border-bottom-color:#d9dde3}" \
     "body.light .tabs button{background:none;color:#626b75}" \
     "body.light .tabs button:hover{color:#20242a}" \
-    "body.light .tabs button.on{color:#b98700;border-bottom-color:#FFBB00}"
+    "body.light .tabs button.on{color:#b98700;border-bottom-color:#FFBB00}" \
+    ".ib{margin-left:.5rem;padding:0 .4rem;font-size:.8rem;line-height:1.4;vertical-align:middle}"
 
 #define TAB_HTML \
     "<div class=\"tabs\">" \
     "<button id=\"tb-status\" onclick=\"tab('status')\">Status</button>" \
-    "<button id=\"tb-net\" onclick=\"tab('net')\">Network</button>" \
     "<button id=\"tb-wifi\" onclick=\"tab('wifi')\">WiFi</button>" \
     "<button id=\"tb-bridge\" onclick=\"tab('bridge')\">Bridge firmware</button>" \
     "<button id=\"tb-fc\" onclick=\"tab('fc')\">Flash FC</button></div>"
 
 #define TAB_JS \
-    "var tabIds=['status','net','wifi','bridge','fc'];" \
+    "var tabIds=['status','wifi','bridge','fc'];" \
     "function tab(n){tabIds.forEach(function(x){" \
     "document.getElementById('p-'+x).classList.toggle('on',x===n);" \
     "document.getElementById('tb-'+x).classList.toggle('on',x===n)});" \
@@ -249,9 +249,8 @@ static const char PAGE[] =
     "<div class=\"pane\" id=\"p-status\"><div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
     "<tr><td class=\"k\">Configurator</td><td id=\"tcp\">…</td></tr>"
-    "</table></div></div>"
-    "<div class=\"pane\" id=\"p-net\"><div class=\"card\"><table>"
-    "<tr><td class=\"k\">WiFi network</td><td id=\"sta\">…</td></tr>"
+    "<tr><td class=\"k\">WiFi network</td><td><span id=\"sta\">…</span>"
+    "<button class=\"sec ib\" type=\"button\" onclick=\"tab('wifi')\" title=\"WiFi settings\" aria-label=\"WiFi settings\">&#9881;</button></td></tr>"
     "<tr><td class=\"k\">Signal</td><td id=\"rssi\">…</td></tr>"
     "<tr><td class=\"k\">IP address</td><td id=\"ip\">…</td></tr>"
     "<tr><td class=\"k\">Browser connect</td><td id=\"url\">…</td></tr>"
@@ -352,7 +351,7 @@ static const char PAGE[] =
     "function t(a,b){return zh?b:a}function put(id,text,kind){var e=$(id);e.className=(id==='ip'||id==='url'||id==='gw'||id==='mask'||id==='board'||id==='slot'?'mono ':'')+(kind||'');e.textContent=text}"
     "function theme(){document.body.classList.toggle('light',light);$('theme').textContent=light?'\\u263e':'\\u2600';$('theme').title=light?t('Dark theme','\\u6df1\\u8272\\u6a21\\u5f0f'):t('Light theme','\\u4eae\\u8272\\u6a21\\u5f0f');localStorage.bridgeTheme=light?'light':'dark'}"
     "function toggleTheme(){light=!light;theme()}function toggleLang(){zh=!zh;localStorage.bridgeLang=zh?'zh':'en';lang();fileChanged()}"
-    "function lang(){var k=t(['FC (USB VCP)','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','Network','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','\\u7f51\\u7edc','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';fcLang();theme();scan();status()}"
+    "function lang(){var k=t(['FC (USB VCP)','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';fcLang();theme();scan();status()}"
     "function pick(){$('manualwrap').style.display=$('ssid').value==='__manual__'?'block':'none'}function bars(r){return r>=-55?'\\u2588':r>=-67?'\\u2586':r>=-78?'\\u2584':'\\u2582'}"
     "function status(){fetch('/status').then(function(r){return r.json()}).then(function(s){put('usb',s.usb.dfu?t('BOOTLOADER ','\\u5f15\\u5bfc\\u7a0b\\u5e8f ')+s.usb.dfuid:s.usb.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+s.usb.id:t('WAITING','\\u7b49\\u5f85\\u4e2d'),s.usb.dfu?'warn':s.usb.up?'up':'down');var v=s.tcp.via==='tcp'?'TCP :'+s.tcp.port:s.tcp.via==='wss'?'WSS':'WS';put('tcp',s.tcp.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+v:t('NONE','\\u65e0'),s.tcp.up?'up':'down');var w=s.wifi;put('sta',w.state==='connected'?w.ssid:w.state==='connecting'?t('CONNECTING','\\u6b63\\u5728\\u8fde\\u63a5'):w.state==='failed'?t('FAILED ','\\u8fde\\u63a5\\u5931\\u8d25 ')+w.ssid:t('NONE','\\u65e0'),w.state==='connected'?'up':w.state==='idle'?'down':'warn');put('rssi',w.state==='connected'&&w.rssi?bars(w.rssi)+' '+w.rssi+' dBm':'-',w.state==='connected'?(w.rssi>=-60?'up':'warn'):'down');put('ip',w.ip||'-',w.ip?'':'down');put('url',w.ip?'wss://'+w.ip+'/serial':'-',w.ip?'':'down');put('gw',w.gw||'-',w.gw?'':'down');put('mask',w.netmask||'-',w.netmask?'':'down');put('ap',w.ap?t('SETUP MODE','\\u914d\\u7f6e\\u6a21\\u5f0f'):t('OFF','\\u5173\\u95ed'),w.ap?'warn':'down');put('board',s.ota.board);put('slot',s.ota.slot+' '+(s.ota.valid?t('VALID','\\u6709\\u6548'):t('PENDING','\\u7b49\\u9a8c\\u8bc1')),s.ota.valid?'up':'warn')}).catch(function(){})}"
     "function scan(){var s=$('ssid');s.innerHTML='<option>'+t('Scanning...','\\u626b\\u63cf\\u4e2d...')+'</option>';fetch('/scan').then(function(r){return r.json()}).then(function(l){var o='<option value=\\\"\\\">'+t('Select a network','\\u8bf7\\u9009\\u62e9\\u7f51\\u7edc')+'</option>';l.forEach(function(x){o+='<option value=\\\"'+x.ssid.replace(/\\\"/g,'&quot;')+'\\\">'+bars(x.rssi)+' '+x.ssid+(x.secure?' \\uD83D\\uDD12':'')+'</option>'});s.innerHTML=o+'<option value=\\\"__manual__\\\">'+t('Other network','\\u5176\\u4ed6\\u7f51\\u7edc')+'</option>';pick()}).catch(function(){s.innerHTML='<option>'+t('Scan failed','\\u626b\\u63cf\\u5931\\u8d25')+'</option>'})}"
@@ -410,12 +409,8 @@ static const char PAGE[] =
     "<div class=\"pane\" id=\"p-status\"><div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
     "<tr><td class=\"k\">Client</td><td id=\"tcp\">…</td></tr>"
-    "</table>"
-    "<div class=\"btns\"><button class=\"sec\" onclick=\"kick()\">Disconnect client</button>"
-    "<button class=\"sec\" onclick=\"reboot()\">Restart bridge</button></div>"
-    "<div class=\"msg\" id=\"ctl\"></div></div></div>"
-    "<div class=\"pane\" id=\"p-net\"><div class=\"card\"><table>"
-    "<tr><td class=\"k\">WiFi network</td><td id=\"sta\">…</td></tr>"
+    "<tr><td class=\"k\">WiFi network</td><td><span id=\"sta\">…</span>"
+    "<button class=\"sec ib\" type=\"button\" onclick=\"tab('wifi')\" title=\"WiFi settings\" aria-label=\"WiFi settings\">&#9881;</button></td></tr>"
     "<tr><td class=\"k\">Signal</td><td id=\"rssi\">…</td></tr>"
     "<tr><td class=\"k\">IP address</td><td id=\"ip\">…</td></tr>"
     "<tr><td class=\"k\">mDNS name</td><td id=\"host\">…</td></tr>"
@@ -424,7 +419,10 @@ static const char PAGE[] =
     "<tr><td class=\"k\">Gateway</td><td id=\"gw\">…</td></tr>"
     "<tr><td class=\"k\">Netmask</td><td id=\"mask\">…</td></tr>"
     "<tr><td class=\"k\">Access point</td><td id=\"ap\">…</td></tr>"
-    "</table></div></div>"
+    "</table>"
+    "<div class=\"btns\"><button class=\"sec\" onclick=\"kick()\">Disconnect client</button>"
+    "<button class=\"sec\" onclick=\"reboot()\">Restart bridge</button></div>"
+    "<div class=\"msg\" id=\"ctl\"></div></div></div>"
     "<div class=\"pane\" id=\"p-wifi\"><div class=\"card\"><h2>Join a WiFi network</h2>"
     "<label for=\"ssid\">Network</label>"
     "<select id=\"ssid\" onchange=\"pick()\"><option value=\"\">— scanning… —</option>"
