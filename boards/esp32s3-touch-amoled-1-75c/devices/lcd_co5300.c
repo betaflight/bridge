@@ -205,7 +205,9 @@ lv_display_t *bsp_display_start(void)
         ESP_LOGE(TAG, "LVGL display registration failed");
         return NULL;
     }
+    lvgl_port_lock(0);
     lv_display_add_event_cb(s_display, round_area_cb, LV_EVENT_INVALIDATE_AREA, NULL);
+    lvgl_port_unlock();
 
     if (!touch_start(s_display)) {
         ESP_LOGW(TAG, "touch unavailable; display is read-only");

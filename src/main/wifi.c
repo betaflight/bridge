@@ -64,6 +64,7 @@ static char              s_sta_netmask[16];  // netmask when connected
 
 static esp_timer_handle_t s_retry_timer;
 static esp_timer_handle_t s_ap_off_timer;
+static int64_t            s_ap_off_at_us;     // AP may stop from this time
 
 static inline void lock(void)   { xSemaphoreTake(s_lock, portMAX_DELAY); }
 static inline void unlock(void) { xSemaphoreGive(s_lock); }
@@ -96,7 +97,9 @@ static void schedule_retry(void)
 static void ap_off_timer_cb(void *arg)
 {
     lock();
-    if (s_ap_active && s_sta_state == WIFI_STA_CONNECTED) {
+    // A rejoin can rearm the timer while this callback waits on the lock; the
+    // deadline it set is the one that counts.
+    if (s_ap_active && s_sta_state == WIFI_STA_CONNECTED && esp_timer_get_time() >= s_ap_off_at_us) {
         s_ap_active = false;
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_LOGI(TAG, "station connected; SoftAP stopped");
@@ -209,6 +212,7 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         snprintf(s_sta_gw, sizeof(s_sta_gw), IPSTR, IP2STR(&event->ip_info.gw));
         snprintf(s_sta_netmask, sizeof(s_sta_netmask), IPSTR, IP2STR(&event->ip_info.netmask));
         bool ap_active = s_ap_active;
+        s_ap_off_at_us = esp_timer_get_time() + AP_LINGER_MS * 1000LL;
         unlock();
         if (ap_active) {
             esp_timer_stop(s_ap_off_timer);   // no-op when not armed

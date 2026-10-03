@@ -517,6 +517,7 @@ static void build_ui(void)
         lv_obj_set_style_border_width(dot, 0, 0);
         lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
     }
+    lv_tileview_set_tile(tv, tile_status, LV_ANIM_OFF);
     lv_obj_add_event_cb(tv, page_changed, LV_EVENT_VALUE_CHANGED, dots);
     lv_obj_send_event(tv, LV_EVENT_VALUE_CHANGED, NULL);
 }
