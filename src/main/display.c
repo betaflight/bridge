@@ -248,6 +248,19 @@ static void modal_open(const wifi_scan_ap_t *ap)
     lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_add_event_cb(kb, join_selected, LV_EVENT_READY, ta);   // keyboard tick
     lv_obj_add_event_cb(kb, modal_cancel, LV_EVENT_CANCEL, NULL); // keyboard cross
+
+#if CONFIG_BRIDGE_DISPLAY_ROUND
+    // Restack down the middle of the circle, the keyboard across its widest band.
+    lv_obj_set_width(title, 280);
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_set_width(ta, 300);
+    lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_set_size(kb, 400, 190);
+    lv_obj_align(kb, LV_ALIGN_TOP_MID, 0, 146);
+    lv_obj_align(join, LV_ALIGN_TOP_MID, -60, 352);
+    lv_obj_align(cancel, LV_ALIGN_TOP_MID, 60, 352);
+#endif
 }
 
 static void ap_clicked(lv_event_t *e)
@@ -320,6 +333,28 @@ static void forget_clicked(lv_event_t *e)
 
 // ------------------------------------------------------------- UI assembly
 
+#if CONFIG_BRIDGE_DISPLAY_ROUND
+LV_IMAGE_DECLARE(bf_mark);
+
+// Key above value, both centred in the column, so a value gets the full chord.
+static lv_obj_t *add_row(lv_obj_t *parent, const char *key)
+{
+    lv_obj_t *k = lv_label_create(parent);
+    lv_label_set_text(k, key);
+    lv_obj_set_style_text_font(k, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(k, lv_color_hex(COL_KEY), 0);
+
+    lv_obj_t *v = lv_label_create(parent);
+    lv_label_set_text(v, "...");
+    lv_label_set_long_mode(v, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(v, LV_PCT(100));
+    lv_obj_set_style_text_align(v, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(v, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(v, lv_color_hex(COL_TEXT), 0);
+    lv_obj_set_style_pad_bottom(v, 8, 0);
+    return v;
+}
+#else
 static lv_obj_t *add_row(lv_obj_t *parent, const char *key)
 {
     lv_obj_t *row = lv_obj_create(parent);
@@ -344,11 +379,30 @@ static lv_obj_t *add_row(lv_obj_t *parent, const char *key)
     lv_obj_align(v, LV_ALIGN_TOP_RIGHT, 0, 0);
     return v;
 }
+#endif
 
 static void build_status_tab(lv_obj_t *tab)
 {
     lv_obj_set_flex_flow(tab, LV_FLEX_FLOW_COLUMN);
+#if CONFIG_BRIDGE_DISPLAY_ROUND
+    // Inset to the circle's inscribed width; the vertical inset lets the first
+    // and last rows scroll clear of the curve.
+    lv_obj_set_flex_align(tab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_hor(tab, 64, 0);
+    lv_obj_set_style_pad_ver(tab, 72, 0);
+
+    // Faint watermark behind the rows; floating so it stays put as they scroll.
+    lv_obj_t *mark = lv_image_create(tab);
+    lv_image_set_src(mark, &bf_mark);
+    lv_obj_set_style_image_recolor(mark, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_image_recolor_opa(mark, LV_OPA_COVER, 0);
+    lv_obj_set_style_image_opa(mark, LV_OPA_20, 0);
+    lv_obj_add_flag(mark, LV_OBJ_FLAG_FLOATING);
+    lv_obj_remove_flag(mark, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_align(mark, LV_ALIGN_CENTER, 0, 0);
+#else
     lv_obj_set_style_pad_all(tab, 14, 0);
+#endif
     lv_obj_set_style_pad_row(tab, 2, 0);
 
     s_val_fc   = add_row(tab, "FC (USB VCP)");
@@ -371,6 +425,103 @@ static void build_status_tab(lv_obj_t *tab)
     lv_timer_create(refresh_cb, REFRESH_MS, NULL);
     refresh_cb(NULL);
 }
+
+#if CONFIG_BRIDGE_DISPLAY_ROUND
+
+static void build_wifi_tab(lv_obj_t *tab)
+{
+    lv_obj_set_flex_flow(tab, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(tab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_hor(tab, 56, 0);
+    lv_obj_set_style_pad_top(tab, 64, 0);
+    lv_obj_set_style_pad_bottom(tab, 72, 0);
+    lv_obj_set_style_pad_row(tab, 10, 0);
+    lv_obj_remove_flag(tab, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *buttons = lv_obj_create(tab);
+    lv_obj_set_size(buttons, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(buttons, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(buttons, 0, 0);
+    lv_obj_set_style_pad_all(buttons, 0, 0);
+    lv_obj_set_style_pad_column(buttons, 8, 0);
+    lv_obj_set_flex_flow(buttons, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(buttons, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(buttons, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *rescan = lv_button_create(buttons);
+    lv_obj_set_style_bg_color(rescan, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_t *rl = lv_label_create(rescan);
+    lv_label_set_text(rl, LV_SYMBOL_REFRESH " Rescan");
+    lv_obj_set_style_text_color(rl, lv_color_hex(0x15140e), 0);
+    lv_obj_add_event_cb(rescan, rescan_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *forget = lv_button_create(buttons);
+    lv_obj_set_style_bg_color(forget, lv_color_hex(0x222831), 0);
+    lv_obj_t *fl = lv_label_create(forget);
+    lv_label_set_text(fl, LV_SYMBOL_TRASH " Forget");
+    lv_obj_add_event_cb(forget, forget_clicked, LV_EVENT_CLICKED, NULL);
+
+    s_spinner = lv_spinner_create(buttons);
+    lv_obj_set_size(s_spinner, 28, 28);
+
+    s_ap_list = lv_list_create(tab);
+    lv_obj_set_width(s_ap_list, LV_PCT(100));
+    lv_obj_set_flex_grow(s_ap_list, 1);
+    lv_obj_set_style_radius(s_ap_list, 24, 0);
+    lv_obj_set_style_bg_color(s_ap_list, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_border_color(s_ap_list, lv_color_hex(COL_BORDER), 0);
+    lv_obj_t *hint = lv_list_add_text(s_ap_list, "scanning...");
+    lv_obj_set_style_text_color(hint, lv_color_hex(COL_KEY), 0);
+}
+
+static void page_changed(lv_event_t *e)
+{
+    lv_obj_t *tv = lv_event_get_target(e);
+    lv_obj_t *dots = lv_event_get_user_data(e);
+    int32_t active = lv_obj_get_index(lv_tileview_get_tile_active(tv));
+    for (int32_t i = 0; i < (int32_t)lv_obj_get_child_count(dots); i++) {
+        lv_obj_set_style_bg_color(lv_obj_get_child(dots, i),
+                                  lv_color_hex(i == active ? COL_ACCENT : COL_BORDER), 0);
+    }
+}
+
+// Swipeable Status | WiFi pages with page dots along the bottom of the circle,
+// in place of a tab bar the curve would clip.
+static void build_ui(void)
+{
+    lv_obj_t *screen = lv_screen_active();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
+
+    lv_obj_t *tv = lv_tileview_create(screen);
+    lv_obj_set_style_bg_color(tv, lv_color_hex(COL_BG), 0);
+    lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *tile_status = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
+    lv_obj_t *tile_wifi   = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT);
+    build_status_tab(tile_status);
+    build_wifi_tab(tile_wifi);
+
+    lv_obj_t *dots = lv_obj_create(screen);
+    lv_obj_set_size(dots, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(dots, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(dots, 0, 0);
+    lv_obj_set_style_pad_all(dots, 0, 0);
+    lv_obj_set_style_pad_column(dots, 10, 0);
+    lv_obj_set_flex_flow(dots, LV_FLEX_FLOW_ROW);
+    lv_obj_remove_flag(dots, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(dots, LV_ALIGN_BOTTOM_MID, 0, -26);
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t *dot = lv_obj_create(dots);
+        lv_obj_set_size(dot, 8, 8);
+        lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_width(dot, 0, 0);
+        lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    }
+    lv_obj_add_event_cb(tv, page_changed, LV_EVENT_VALUE_CHANGED, dots);
+    lv_obj_send_event(tv, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
+#else
 
 static void build_wifi_tab(lv_obj_t *tab)
 {
@@ -425,6 +576,8 @@ static void build_ui(void)
     build_status_tab(tab_status);
     build_wifi_tab(tab_wifi);
 }
+
+#endif
 
 void display_start(void)
 {

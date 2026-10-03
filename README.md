@@ -57,6 +57,7 @@ fonts, logos, managed components — stays there. The USB-host pins
 | `esp32s3-wroom-freenove` | 8 MB | 8 MB octal | dual (native + UART) | WiFi LED (GPIO2) + NeoPixel (GPIO48) |
 | `esp32s3-touch-lcd-4b` | 16 MB | 8 MB octal | single (native) | 4" LCD touch UI |
 | `esp32s3-hglrc-a1` | 4 MB | — | dual | NeoPixel (GPIO48) + 1.47" LCD |
+| `esp32s3-touch-amoled-1-75c` | 32 MB | 8 MB octal | single (native) | 1.75" round AMOLED touch UI |
 
 A board identity (`BOARD_NAME`) is baked into each image (`esp_app_desc.version`)
 and checked on OTA, so an image built for one board is refused on another (see
@@ -123,6 +124,23 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **Partitions:** 4 MB dual-OTA, ~1.8 MB per slot
   (`boards/esp32s3-hglrc-a1/partitions.csv`).
 
+### `esp32s3-touch-amoled-1-75c` — [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/esp32-s3-touch-amoled-1.75c.htm)
+
+- **MCU / memory:** ESP32-S3R8 — 32 MB flash, 8 MB **octal** PSRAM.
+- **Display:** 1.75" 466×466 round AMOLED (CO5300, QSPI) with CST9217
+  capacitive touch, driven directly with LVGL
+  (`CONFIG_BRIDGE_DISPLAY_TOUCH` + `CONFIG_BRIDGE_DISPLAY_ROUND`). Same status
+  and WiFi scan/join/forget as the 4" touch UI, laid out for the circle as two
+  swipeable pages.
+- **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
+  shared between flashing/console and the USB-host bridge — **the serial
+  console drops out once host mode engages**. Run it from a 3.7 V LiPo on the
+  MX1.25 battery header (AXP2101 PMU, PWR button) when the USB-C is hosting
+  the FC.
+- **LEDs:** none — status is on the display.
+- **Partitions:** 32 MB flash, dual-OTA with 6 MB per slot
+  (`boards/esp32s3-touch-amoled-1-75c/partitions.csv`).
+
 ### Status LED behaviour
 
 | LED | State | Meaning |
@@ -157,6 +175,8 @@ Boards with extra hardware may also add:
 - `board_display.h` — declares `bsp_display_start/lock/unlock/backlight_on()`
   for `CONFIG_BRIDGE_DISPLAY_TOUCH` or `CONFIG_BRIDGE_DISPLAY_COMPACT`, either
   by including a vendor BSP header or by declaring a local driver.
+- `CONFIG_BRIDGE_DISPLAY_ROUND` alongside `CONFIG_BRIDGE_DISPLAY_TOUCH` lays the
+  touch UI out for a circular panel.
 - For `CONFIG_BRIDGE_DISPLAY_COMPACT` only, `display.c` also expects a
   `board_logo.h` defining an `lv_image_dsc_t board_logo`, and the LVGL fonts
   `ui_font_size14` and `ui_font_size24`. Register their `.c` files and the

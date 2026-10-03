@@ -30,6 +30,15 @@ menu "Betaflight bridge"
 
     endchoice
 
+    config BRIDGE_DISPLAY_ROUND
+        bool "Round panel layout"
+        depends on BRIDGE_DISPLAY_TOUCH
+        default n
+        help
+            Lay the touch UI out for a circular panel: swipeable Status and
+            WiFi pages with their content kept inside the circle, instead of
+            the tab bar used on rectangular panels.
+
     config BRIDGE_ADC_VOLTAGE
         bool "Input voltage monitor"
         default n
