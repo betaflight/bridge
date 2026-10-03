@@ -331,14 +331,17 @@ up its own SoftAP so you can set it up:
 3. Browse to `http://192.168.4.1/`. The page shows live USB/TCP/WiFi status and
    lets you **scan for and join your home network**: pick an SSID (or type one),
    enter the password, and hit *Join*. Credentials are saved to NVS and applied
-   immediately — the status panel shows the assigned IP and netmask.
+   immediately — the status panel shows the assigned IP and netmask. The SoftAP
+   stays up for 30 s after the join so you can note the new address, then
+   stops.
 4. In Configurator choose the **TCP** connection, host `192.168.4.1`, port
    `5761` (or the station IP once joined).
 
 After a network is stored, **subsequent boots join it directly as a station and
 the SoftAP is not started** — reach the web UI and Configurator at the IP your
 router assigns (shown on the page). If that network is ever unreachable at boot,
-the SoftAP comes back up automatically so you can reconfigure. Use *Forget* on
+the SoftAP comes back up automatically so you can reconfigure, and stops again
+30 s after the network is rejoined. Use *Forget* on
 the page to clear the stored network and return to AP-only setup mode.
 
 ### Discovery (mDNS)
