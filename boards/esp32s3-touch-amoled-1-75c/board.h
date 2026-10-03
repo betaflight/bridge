@@ -34,6 +34,7 @@
 #pragma once
 
 #include "driver/gpio.h"
+#include "driver/i2c_types.h"
 
 #define BOARD_NAME "esp32s3-touch-amoled-1-75c"
 
@@ -51,7 +52,9 @@
 #define BSP_LCD_DATA3           GPIO_NUM_7
 #define BSP_LCD_RST             GPIO_NUM_1
 
-// CST9217 touch on I2C (shared with the codecs and IMU, which are unused).
+// CST9217 touch and the AXP2101 PMU on I2C (shared with the codecs and IMU,
+// which are unused).
+#define BOARD_PMU_I2C_PORT      I2C_NUM_0
 #define BSP_I2C_SCL             GPIO_NUM_14
 #define BSP_I2C_SDA             GPIO_NUM_15
 #define BSP_TOUCH_RST           GPIO_NUM_2

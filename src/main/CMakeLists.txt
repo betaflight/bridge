@@ -20,6 +20,7 @@ idf_component_register(
         "display.c"
         "bf_mark.c"
         "bridge_mdns.c"
+        "battery.c"
     EMBED_TXTFILES
         "icon.svg"                              # favicon served at /icon.svg
     INCLUDE_DIRS

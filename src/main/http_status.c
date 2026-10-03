@@ -24,6 +24,7 @@
 #include "tcp_server.h"
 #include "wifi.h"
 #include "ota.h"
+#include "battery.h"
 #include "fc_flash.h"
 #include "dfu_host.h"
 #include "ws_serial.h"
@@ -248,6 +249,7 @@ static const char PAGE[] =
     TAB_HTML
     "<div class=\"pane\" id=\"p-status\"><div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
+    "<tr id=\"batrow\" style=\"display:none\"><td class=\"k\">Battery</td><td id=\"bat\">…</td></tr>"
     "<tr><td class=\"k\">Configurator</td><td id=\"tcp\">…</td></tr>"
     "<tr><td class=\"k\">WiFi network</td><td><span id=\"sta\">…</span>"
     "<button class=\"sec ib\" type=\"button\" onclick=\"tab('wifi')\" title=\"WiFi settings\" aria-label=\"WiFi settings\">&#9881;</button></td></tr>"
@@ -351,9 +353,9 @@ static const char PAGE[] =
     "function t(a,b){return zh?b:a}function put(id,text,kind){var e=$(id);e.className=(id==='ip'||id==='url'||id==='gw'||id==='mask'||id==='board'||id==='slot'?'mono ':'')+(kind||'');e.textContent=text}"
     "function theme(){document.body.classList.toggle('light',light);$('theme').textContent=light?'\\u263e':'\\u2600';$('theme').title=light?t('Dark theme','\\u6df1\\u8272\\u6a21\\u5f0f'):t('Light theme','\\u4eae\\u8272\\u6a21\\u5f0f');localStorage.bridgeTheme=light?'light':'dark'}"
     "function toggleTheme(){light=!light;theme()}function toggleLang(){zh=!zh;localStorage.bridgeLang=zh?'zh':'en';lang();fileChanged()}"
-    "function lang(){var k=t(['FC (USB VCP)','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';fcLang();theme();scan();status()}"
+    "function lang(){var k=t(['FC (USB VCP)','Battery','Configurator','WiFi network','Signal','IP address','Browser connect','Gateway','Netmask','Access point','Board','Firmware slot'],['FC (USB VCP)','\\u7535\\u6c60','\\u914d\\u7f6e\\u5668','WiFi \\u7f51\\u7edc','\\u4fe1\\u53f7','IP \\u5730\\u5740','\\u6d4f\\u89c8\\u5668\\u8fde\\u63a5','\\u7f51\\u5173','\\u5b50\\u7f51\\u63a9\\u7801','\\u70ed\\u70b9','\\u677f\\u5361','\\u56fa\\u4ef6\\u5206\\u533a']);document.querySelectorAll('.k').forEach(function(x,i){x.textContent=k[i]});document.querySelector('.tag').textContent=t('USB host / WiFi bridge for Betaflight ['+'" BRIDGE_VERSION "'+']','USB \\u4e3b\\u673a / Betaflight WiFi \\u7f51\\u6865 ['+'" BRIDGE_VERSION "'+']');var h=document.querySelectorAll('h2');h[0].textContent=t('Join a WiFi network','\\u52a0\\u5165 WiFi \\u7f51\\u7edc');h[1].textContent=t('Bridge firmware','\\u7f51\\u6865\\u56fa\\u4ef6');var l=document.querySelectorAll('label'),lt=t(['Network','SSID','Password'],['\\u7f51\\u7edc','SSID','\\u5bc6\\u7801']);lt.forEach(function(v,i){if(l[i])l[i].textContent=v});var b=document.querySelectorAll('.btns button'),bt=t(['Join network','Rescan','Forget','Upload & reboot'],['\\u52a0\\u5165\\u7f51\\u7edc','\\u91cd\\u65b0\\u626b\\u63cf','\\u5fd8\\u8bb0\\u7f51\\u7edc','\\u4e0a\\u4f20\\u5e76\\u91cd\\u542f']);bt.forEach(function(v,i){if(b[i])b[i].textContent=v});$('pass').placeholder=t('(blank for open networks)','(\\u5f00\\u653e\\u7f51\\u7edc\\u53ef\\u7559\\u7a7a)');var tt=t(['Status','WiFi','Bridge firmware','Flash FC'],['\\u72b6\\u6001','WiFi','\\u7f51\\u6865\\u56fa\\u4ef6','\\u5237\\u5199\\u98de\\u63a7']);tabIds.forEach(function(x,i){$('tb-'+x).textContent=tt[i]});$('lang').textContent=zh?'EN':'CN';fcLang();theme();scan();status()}"
     "function pick(){$('manualwrap').style.display=$('ssid').value==='__manual__'?'block':'none'}function bars(r){return r>=-55?'\\u2588':r>=-67?'\\u2586':r>=-78?'\\u2584':'\\u2582'}"
-    "function status(){fetch('/status').then(function(r){return r.json()}).then(function(s){put('usb',s.usb.dfu?t('BOOTLOADER ','\\u5f15\\u5bfc\\u7a0b\\u5e8f ')+s.usb.dfuid:s.usb.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+s.usb.id:t('WAITING','\\u7b49\\u5f85\\u4e2d'),s.usb.dfu?'warn':s.usb.up?'up':'down');var v=s.tcp.via==='tcp'?'TCP :'+s.tcp.port:s.tcp.via==='wss'?'WSS':'WS';put('tcp',s.tcp.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+v:t('NONE','\\u65e0'),s.tcp.up?'up':'down');var w=s.wifi;put('sta',w.state==='connected'?w.ssid:w.state==='connecting'?t('CONNECTING','\\u6b63\\u5728\\u8fde\\u63a5'):w.state==='failed'?t('FAILED ','\\u8fde\\u63a5\\u5931\\u8d25 ')+w.ssid:t('NONE','\\u65e0'),w.state==='connected'?'up':w.state==='idle'?'down':'warn');put('rssi',w.state==='connected'&&w.rssi?bars(w.rssi)+' '+w.rssi+' dBm':'-',w.state==='connected'?(w.rssi>=-60?'up':'warn'):'down');put('ip',w.ip||'-',w.ip?'':'down');put('url',w.ip?'wss://'+w.ip+'/serial':'-',w.ip?'':'down');put('gw',w.gw||'-',w.gw?'':'down');put('mask',w.netmask||'-',w.netmask?'':'down');put('ap',w.ap?t('SETUP MODE','\\u914d\\u7f6e\\u6a21\\u5f0f'):t('OFF','\\u5173\\u95ed'),w.ap?'warn':'down');put('board',s.ota.board);put('slot',s.ota.slot+' '+(s.ota.valid?t('VALID','\\u6709\\u6548'):t('PENDING','\\u7b49\\u9a8c\\u8bc1')),s.ota.valid?'up':'warn')}).catch(function(){})}"
+    "function status(){fetch('/status').then(function(r){return r.json()}).then(function(s){put('usb',s.usb.dfu?t('BOOTLOADER ','\\u5f15\\u5bfc\\u7a0b\\u5e8f ')+s.usb.dfuid:s.usb.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+s.usb.id:t('WAITING','\\u7b49\\u5f85\\u4e2d'),s.usb.dfu?'warn':s.usb.up?'up':'down');if(s.bat){$('batrow').style.display='';var b=s.bat;put('bat',b.present?(b.charging?t('CHARGING ','\\u5145\\u7535\\u4e2d '):'')+(b.mv/1000).toFixed(2)+' V '+b.pct+'%':t('NONE','\\u65e0'),b.present?(b.pct>=30?'up':'warn'):'down')}var v=s.tcp.via==='tcp'?'TCP :'+s.tcp.port:s.tcp.via==='wss'?'WSS':'WS';put('tcp',s.tcp.up?t('CONNECTED ','\\u5df2\\u8fde\\u63a5 ')+v:t('NONE','\\u65e0'),s.tcp.up?'up':'down');var w=s.wifi;put('sta',w.state==='connected'?w.ssid:w.state==='connecting'?t('CONNECTING','\\u6b63\\u5728\\u8fde\\u63a5'):w.state==='failed'?t('FAILED ','\\u8fde\\u63a5\\u5931\\u8d25 ')+w.ssid:t('NONE','\\u65e0'),w.state==='connected'?'up':w.state==='idle'?'down':'warn');put('rssi',w.state==='connected'&&w.rssi?bars(w.rssi)+' '+w.rssi+' dBm':'-',w.state==='connected'?(w.rssi>=-60?'up':'warn'):'down');put('ip',w.ip||'-',w.ip?'':'down');put('url',w.ip?'wss://'+w.ip+'/serial':'-',w.ip?'':'down');put('gw',w.gw||'-',w.gw?'':'down');put('mask',w.netmask||'-',w.netmask?'':'down');put('ap',w.ap?t('SETUP MODE','\\u914d\\u7f6e\\u6a21\\u5f0f'):t('OFF','\\u5173\\u95ed'),w.ap?'warn':'down');put('board',s.ota.board);put('slot',s.ota.slot+' '+(s.ota.valid?t('VALID','\\u6709\\u6548'):t('PENDING','\\u7b49\\u9a8c\\u8bc1')),s.ota.valid?'up':'warn')}).catch(function(){})}"
     "function scan(){var s=$('ssid');s.innerHTML='<option>'+t('Scanning...','\\u626b\\u63cf\\u4e2d...')+'</option>';fetch('/scan').then(function(r){return r.json()}).then(function(l){var o='<option value=\\\"\\\">'+t('Select a network','\\u8bf7\\u9009\\u62e9\\u7f51\\u7edc')+'</option>';l.forEach(function(x){o+='<option value=\\\"'+x.ssid.replace(/\\\"/g,'&quot;')+'\\\">'+bars(x.rssi)+' '+x.ssid+(x.secure?' \\uD83D\\uDD12':'')+'</option>'});s.innerHTML=o+'<option value=\\\"__manual__\\\">'+t('Other network','\\u5176\\u4ed6\\u7f51\\u7edc')+'</option>';pick()}).catch(function(){s.innerHTML='<option>'+t('Scan failed','\\u626b\\u63cf\\u5931\\u8d25')+'</option>'})}"
     "function join(){var v=$('ssid').value;if(v==='__manual__')v=$('manual').value;if(!v){$('msg').textContent=t('Select or enter a network.','\\u8bf7\\u9009\\u62e9\\u6216\\u8f93\\u5165\\u7f51\\u7edc\\u3002');return}$('msg').textContent=t('Saving and connecting...','\\u6b63\\u5728\\u4fdd\\u5b58\\u5e76\\u8fde\\u63a5...');fetch('/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='+encodeURIComponent(v)+'&pass='+encodeURIComponent($('pass').value)}).then(function(r){$('msg').textContent=r.ok?t('Saved. Connecting...','\\u5df2\\u4fdd\\u5b58\\uff0c\\u6b63\\u5728\\u8fde\\u63a5...'):t('Unable to save network.','\\u65e0\\u6cd5\\u4fdd\\u5b58\\u7f51\\u7edc\\u3002');status()}).catch(function(){$('msg').textContent=t('Request failed.','\\u8bf7\\u6c42\\u5931\\u8d25\\u3002')})}"
     "function forget(){$('msg').textContent=t('Clearing saved network...','\\u6b63\\u5728\\u6e05\\u9664\\u5df2\\u4fdd\\u5b58\\u7684\\u7f51\\u7edc...');fetch('/wifi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'ssid='}).then(function(){$('msg').textContent=t('Stored network cleared.','\\u5df2\\u6e05\\u9664\\u5df2\\u4fdd\\u5b58\\u7684\\u7f51\\u7edc\\u3002');status();scan()})}"
@@ -408,6 +410,7 @@ static const char PAGE[] =
     TAB_HTML
     "<div class=\"pane\" id=\"p-status\"><div class=\"card\"><table>"
     "<tr><td class=\"k\">FC (USB VCP)</td><td id=\"usb\">…</td></tr>"
+    "<tr id=\"batrow\" style=\"display:none\"><td class=\"k\">Battery</td><td id=\"bat\">…</td></tr>"
     "<tr><td class=\"k\">Client</td><td id=\"tcp\">…</td></tr>"
     "<tr><td class=\"k\">WiFi network</td><td><span id=\"sta\">…</span>"
     "<button class=\"sec ib\" type=\"button\" onclick=\"tab('wifi')\" title=\"WiFi settings\" aria-label=\"WiFi settings\">&#9881;</button></td></tr>"
@@ -473,6 +476,8 @@ static const char PAGE[] =
     "$('gw').innerHTML=w.gw?'<code>'+w.gw+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('mask').innerHTML=w.netmask?'<code>'+w.netmask+'</code>':'<span class=\\\"down\\\">—</span>';"
     "$('ap').innerHTML=w.ap?'<span class=\\\"warn\\\">broadcasting (setup mode)</span>':'<span class=\\\"down\\\">off</span>';"
+    "if(s.bat){$('batrow').style.display='';var b=s.bat;"
+    "$('bat').innerHTML=b.present?(b.charging?'<span class=\\\"up\\\">charging</span> ':'')+'<code>'+(b.mv/1000).toFixed(2)+' V</code> <span class=\\\"'+(b.pct>=30?'up':'warn')+'\\\">'+b.pct+'%</span>':'<span class=\\\"down\\\">none</span>';}"
     "$('board').innerHTML='<code>'+s.ota.board+'</code>';"
     "$('slot').innerHTML='<code>'+s.ota.slot+'</code> '+(s.ota.valid?'<span class=\\\"up\\\">valid</span>':'<span class=\\\"warn\\\">pending verify</span>');"
     "}).catch(function(){})}"
@@ -600,20 +605,28 @@ static esp_err_t status_get(httpd_req_t *req)
     bool img_valid = true;
     ota_running_info(slot, sizeof(slot), &img_valid);
 
-    char body[800];
+    // Only on boards with a battery monitor; the page shows the row when present.
+    char bat[96] = "";
+    battery_status_t b;
+    if (battery_get(&b)) {
+        snprintf(bat, sizeof(bat), ",\"bat\":{\"present\":%s,\"mv\":%u,\"pct\":%u,\"charging\":%s}",
+                 b.present ? "true" : "false", b.mv, b.percent, b.charging ? "true" : "false");
+    }
+
+    char body[900];
     int n = snprintf(body, sizeof(body),
         "{\"usb\":{\"up\":%s,\"id\":\"%04x:%04x\",\"dfu\":%s,\"dfuid\":\"%04x:%04x\"},"
         "\"tcp\":{\"up\":%s,\"via\":\"%s\",\"port\":%d},"
         "\"wifi\":{\"state\":\"%s\",\"ap\":%s,\"ssid\":\"%s\",\"host\":\"%s.local\","
         "\"ip\":\"%s\",\"gw\":\"%s\",\"netmask\":\"%s\",\"rssi\":%d},"
-        "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}}",
+        "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}%s}",
         usb ? "true" : "false", vid, pid,
         in_dfu ? "true" : "false", in_dfu ? dfu.vid : 0, in_dfu ? dfu.pid : 0,
         (owner == BRIDGE_CLIENT_TCP || owner == BRIDGE_CLIENT_WS) ? "true" : "false",
         via, TCP_SERVER_PORT,
         state, w.ap_active ? "true" : "false", ssid_esc, bridge_mdns_hostname(),
         w.ip, w.gw, w.netmask, w.rssi,
-        ota_board_id(), slot, img_valid ? "true" : "false");
+        ota_board_id(), slot, img_valid ? "true" : "false", bat);
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, body, n);

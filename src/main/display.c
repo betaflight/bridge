@@ -41,6 +41,7 @@
 #include "bridge.h"
 #include "ws_serial.h"
 #include "ota.h"
+#include "battery.h"
 #include "version.h"
 
 static const char *TAG = "display";
@@ -71,6 +72,9 @@ static lv_obj_t *s_val_gw;
 static lv_obj_t *s_val_mask;
 static lv_obj_t *s_val_ap;
 static lv_obj_t *s_val_slot;
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+static lv_obj_t *s_val_bat;
+#endif
 
 // WiFi tab.
 static lv_obj_t *s_ap_list;
@@ -160,6 +164,17 @@ static void refresh_cb(lv_timer_t *timer)
     ota_running_info(slot, sizeof(slot), &valid);
     snprintf(buf, sizeof(buf), "%s %s", slot, valid ? "valid" : "pending verify");
     set_value(s_val_slot, buf, valid ? COL_UP : COL_WARN);
+
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+    battery_status_t bat;
+    if (battery_get(&bat) && bat.present) {
+        snprintf(buf, sizeof(buf), "%s%u.%02u V  %u%%", bat.charging ? LV_SYMBOL_CHARGE " " : "",
+                 bat.mv / 1000, (bat.mv % 1000) / 10, bat.percent);
+        set_value(s_val_bat, buf, bat.percent >= 30 ? COL_UP : COL_WARN);
+    } else {
+        set_value(s_val_bat, "none", COL_DOWN);
+    }
+#endif
 }
 
 // ---------------------------------------------------------------- WiFi tab
@@ -406,6 +421,9 @@ static void build_status_tab(lv_obj_t *tab)
     lv_obj_set_style_pad_row(tab, 2, 0);
 
     s_val_fc   = add_row(tab, "FC (USB VCP)");
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+    s_val_bat  = add_row(tab, "Battery");
+#endif
     s_val_cfg  = add_row(tab, "Configurator");
     s_val_sta  = add_row(tab, "WiFi network");
     s_val_rssi = add_row(tab, "Signal");
