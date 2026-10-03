@@ -39,7 +39,7 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 | `src/main/hex_parser.c` | Streaming Intel HEX reader; never holds the whole image |
 | `src/main/fc_cli.c` | MSP reboot and CLI `diff all` backup / restore, over the byte bridge |
 | `boards/<board>/` | Per-board component: flash size, partition table, PSRAM, identity and any board-specific hardware |
-| `esp-idf/` | Pinned ESP-IDF (git submodule, `release/v5.4`, shallow) |
+| `esp-idf/` | Pinned ESP-IDF (git submodule, `release/v5.5`, shallow) |
 
 ## Boards
 

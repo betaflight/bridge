@@ -1,5 +1,5 @@
 [submodule "esp-idf"]
 	path = esp-idf
 	url = https://github.com/espressif/esp-idf.git
-	branch = release/v5.4
+	branch = release/v5.5
 	shallow = true
