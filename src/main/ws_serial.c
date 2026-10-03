@@ -148,49 +148,67 @@ static void net_tx_task(void *arg)
     }
 }
 
-static esp_err_t ws_handler(httpd_req_t *req)
+// Runs on the upgrade request, before the 101 response, so a client turned
+// away while the FC is being flashed still gets a reason.
+static esp_err_t ws_check_upgrade(httpd_req_t *req)
 {
-    if (req->method == HTTP_GET) {
-        // A flash in progress owns the FC outright. Claim before touching any
-        // of the session state below, so a refusal leaves the existing client
-        // alone and a flash starting mid-handshake cannot be missed.
-        if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_WS)) {
-            ESP_LOGW(TAG, "refusing client: flashing the FC");
-            httpd_resp_set_status(req, "503 Service Unavailable");
-            httpd_resp_set_type(req, "text/plain");
-            httpd_resp_sendstr(req, "flashing the FC, try again shortly");
-            return ESP_FAIL;
-        }
+    if (bridge_is_flashing()) {
+        ESP_LOGW(TAG, "refusing client: flashing the FC");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "text/plain");
+        httpd_resp_sendstr(req, "flashing the FC, try again shortly");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
 
-        // WebSocket handshake. The newest client wins, whatever transport the
-        // current one is on (so a reconnect isn't locked out by a stale,
-        // half-closed session).
-        int new_fd = httpd_req_to_sockfd(req);
-        ws_session_t *sess = malloc(sizeof(*sess));
-        if (!sess) {
-            return ESP_ERR_NO_MEM;
-        }
-        sess->hd = req->handle;
-        sess->fd = new_fd;
-        req->sess_ctx = sess;
-        req->free_ctx = ws_session_closed;
-        // Newest client wins. Adopt this session first so the predecessor's
-        // teardown (gated on the active fd/owner) can't tear us down, then drop
-        // the previous owner on whichever transport it was.
-        httpd_handle_t prev_hd = s_hd;
-        int prev_fd = s_fd;
-        s_hd = req->handle;
-        s_fd = new_fd;
-        s_closing_fd = -1;
-        if (prev_fd >= 0 && !(prev_hd == req->handle && prev_fd == new_fd)) {
-            ESP_LOGI(TAG, "new client; dropping current WebSocket client");
-            httpd_sess_trigger_close(prev_hd, prev_fd);
-        }
-        s_secure = (req->user_ctx != NULL);   // set per-server at registration
-        ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
-        return ESP_OK;
+// Runs once the 101 response is out (esp_http_server only hands ws_handler()
+// data frames). Taking over only now means no FC bytes reach a socket
+// mid-upgrade, and an upgrade that fails cannot displace the current client.
+static esp_err_t ws_open(httpd_req_t *req)
+{
+    // Allocate first: failing after the claim would leave the bridge owned by
+    // a WebSocket client that has no session.
+    ws_session_t *sess = malloc(sizeof(*sess));
+    if (!sess) {
+        return ESP_ERR_NO_MEM;
     }
 
+    // A flash that started since the upgrade check still owns the FC outright.
+    // Claim before touching any of the session state below, so a refusal
+    // leaves the existing client alone.
+    if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_WS)) {
+        ESP_LOGW(TAG, "refusing client: flashing the FC");
+        free(sess);
+        return ESP_FAIL;
+    }
+
+    // The newest client wins, whatever transport the current one is on (so a
+    // reconnect isn't locked out by a stale, half-closed session).
+    int new_fd = httpd_req_to_sockfd(req);
+    sess->hd = req->handle;
+    sess->fd = new_fd;
+    req->sess_ctx = sess;
+    req->free_ctx = ws_session_closed;
+    // Newest client wins. Adopt this session first so the predecessor's
+    // teardown (gated on the active fd/owner) can't tear us down, then drop
+    // the previous owner on whichever transport it was.
+    httpd_handle_t prev_hd = s_hd;
+    int prev_fd = s_fd;
+    s_hd = req->handle;
+    s_fd = new_fd;
+    s_closing_fd = -1;
+    if (prev_fd >= 0 && !(prev_hd == req->handle && prev_fd == new_fd)) {
+        ESP_LOGI(TAG, "new client; dropping current WebSocket client");
+        httpd_sess_trigger_close(prev_hd, prev_fd);
+    }
+    s_secure = (req->user_ctx != NULL);   // set per-server at registration
+    ESP_LOGI(TAG, "client connected (fd %d, %s)", new_fd, s_secure ? "wss" : "ws");
+    return ESP_OK;
+}
+
+static esp_err_t ws_handler(httpd_req_t *req)
+{
     // A frame from the Configurator. Frames may arrive from a superseded session
     // (one we replaced via newest-wins but that hasn't finished closing) — those
     // must not touch the promoted client's bridge, so gate on the active session.
@@ -235,6 +253,8 @@ void ws_serial_register(httpd_handle_t server, bool secure)
         .method = HTTP_GET,
         .handler = ws_handler,
         .is_websocket = true,
+        .ws_pre_handshake_cb = ws_check_upgrade,
+        .ws_post_handshake_cb = ws_open,
         .handle_ws_control_frames = true,   // deliver CLOSE so we release the claim
         .supported_subprotocol = "binary",   // what the app requests; must be echoed or the browser aborts
         .user_ctx = secure ? &s_secure_marker : NULL,

@@ -18,6 +18,7 @@ idf_component_register(
         "ota.c"
         "leds.c"
         "display.c"
+        "bf_mark.c"
         "bridge_mdns.c"
     EMBED_TXTFILES
         "icon.svg"                              # favicon served at /icon.svg

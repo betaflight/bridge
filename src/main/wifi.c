@@ -41,6 +41,9 @@ static const char *TAG = "wifi";
 #define NVS_NAMESPACE   "wifi"
 #define STA_MAX_RETRY   5
 #define STA_RETRY_INTERVAL_MS  10000
+// How long the setup AP outlives a successful join, so a browser on it can
+// still pick up the new station address before the AP goes.
+#define AP_LINGER_MS           30000
 
 static esp_netif_t *s_ap_netif;
 static esp_netif_t *s_sta_netif;
@@ -60,6 +63,8 @@ static char              s_sta_gw[16];       // gateway when connected
 static char              s_sta_netmask[16];  // netmask when connected
 
 static esp_timer_handle_t s_retry_timer;
+static esp_timer_handle_t s_ap_off_timer;
+static int64_t            s_ap_off_at_us;     // AP may stop from this time
 
 static inline void lock(void)   { xSemaphoreTake(s_lock, portMAX_DELAY); }
 static inline void unlock(void) { xSemaphoreGive(s_lock); }
@@ -84,6 +89,22 @@ static void schedule_retry(void)
 {
     esp_timer_stop(s_retry_timer);   // no-op when not armed
     esp_timer_start_once(s_retry_timer, STA_RETRY_INTERVAL_MS * 1000ULL);
+}
+
+// Joined: the setup/fallback AP has done its job. Under the lock so a
+// concurrent ensure_ap() cannot be undone; esp_wifi_set_mode() only posts
+// events, so no deadlock.
+static void ap_off_timer_cb(void *arg)
+{
+    lock();
+    // A rejoin can rearm the timer while this callback waits on the lock; the
+    // deadline it set is the one that counts.
+    if (s_ap_active && s_sta_state == WIFI_STA_CONNECTED && esp_timer_get_time() >= s_ap_off_at_us) {
+        s_ap_active = false;
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_LOGI(TAG, "station connected; SoftAP stopped");
+    }
+    unlock();
 }
 
 static void start_ap(void);
@@ -190,7 +211,13 @@ static void on_wifi_event(void *arg, esp_event_base_t base, int32_t id, void *da
         snprintf(s_sta_ip, sizeof(s_sta_ip), IPSTR, IP2STR(&event->ip_info.ip));
         snprintf(s_sta_gw, sizeof(s_sta_gw), IPSTR, IP2STR(&event->ip_info.gw));
         snprintf(s_sta_netmask, sizeof(s_sta_netmask), IPSTR, IP2STR(&event->ip_info.netmask));
+        bool ap_active = s_ap_active;
+        s_ap_off_at_us = esp_timer_get_time() + AP_LINGER_MS * 1000LL;
         unlock();
+        if (ap_active) {
+            esp_timer_stop(s_ap_off_timer);   // no-op when not armed
+            esp_timer_start_once(s_ap_off_timer, AP_LINGER_MS * 1000ULL);
+        }
         ESP_LOGI(TAG, "STA got IP " IPSTR " (port 5761)", IP2STR(&event->ip_info.ip));
     }
 }
@@ -313,6 +340,11 @@ void wifi_start(void)
         .name = "wifi_retry",
     };
     ESP_ERROR_CHECK(esp_timer_create(&retry_args, &s_retry_timer));
+    const esp_timer_create_args_t ap_off_args = {
+        .callback = ap_off_timer_cb,
+        .name = "wifi_ap_off",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&ap_off_args, &s_ap_off_timer));
 
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
