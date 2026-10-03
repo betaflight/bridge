@@ -394,9 +394,9 @@ static void build_status_tab(lv_obj_t *tab)
     // Faint watermark behind the rows; floating so it stays put as they scroll.
     lv_obj_t *mark = lv_image_create(tab);
     lv_image_set_src(mark, &bf_mark);
-    lv_obj_set_style_image_recolor(mark, lv_color_hex(COL_ACCENT), 0);
+    lv_obj_set_style_image_recolor(mark, lv_color_hex(COL_TEXT), 0);
     lv_obj_set_style_image_recolor_opa(mark, LV_OPA_COVER, 0);
-    lv_obj_set_style_image_opa(mark, LV_OPA_20, 0);
+    lv_obj_set_style_image_opa(mark, 36, 0);
     lv_obj_add_flag(mark, LV_OBJ_FLAG_FLOATING);
     lv_obj_remove_flag(mark, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_align(mark, LV_ALIGN_CENTER, 0, 0);
