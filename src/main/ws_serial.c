@@ -167,22 +167,25 @@ static esp_err_t ws_check_upgrade(httpd_req_t *req)
 // mid-upgrade, and an upgrade that fails cannot displace the current client.
 static esp_err_t ws_open(httpd_req_t *req)
 {
+    // Allocate first: failing after the claim would leave the bridge owned by
+    // a WebSocket client that has no session.
+    ws_session_t *sess = malloc(sizeof(*sess));
+    if (!sess) {
+        return ESP_ERR_NO_MEM;
+    }
+
     // A flash that started since the upgrade check still owns the FC outright.
     // Claim before touching any of the session state below, so a refusal
     // leaves the existing client alone.
     if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_WS)) {
         ESP_LOGW(TAG, "refusing client: flashing the FC");
+        free(sess);
         return ESP_FAIL;
     }
 
-    // WebSocket handshake. The newest client wins, whatever transport the
-    // current one is on (so a reconnect isn't locked out by a stale,
-    // half-closed session).
+    // The newest client wins, whatever transport the current one is on (so a
+    // reconnect isn't locked out by a stale, half-closed session).
     int new_fd = httpd_req_to_sockfd(req);
-    ws_session_t *sess = malloc(sizeof(*sess));
-    if (!sess) {
-        return ESP_ERR_NO_MEM;
-    }
     sess->hd = req->handle;
     sess->fd = new_fd;
     req->sess_ctx = sess;
