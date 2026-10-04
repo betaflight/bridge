@@ -79,9 +79,12 @@ static esp_err_t poll(battery_status_t *out)
         return err;
     }
     out->present = st1 & 0x08;
+    if (out->present && pct > 100) {
+        return ESP_ERR_INVALID_RESPONSE;   // gauge not ready yet
+    }
     out->charging = ((st2 >> 5) & 0x03) == 0x01;
     out->mv = ((vh & 0x1F) << 8) | vl;
-    out->percent = pct > 100 ? 100 : pct;
+    out->percent = out->present ? pct : 0;
     return ESP_OK;
 }
 
@@ -91,12 +94,16 @@ static void battery_task(void *arg)
     for (;;) {
         battery_status_t st;
         esp_err_t err = poll(&st);
-        taskENTER_CRITICAL(&s_mux);
-        s_valid = (err == ESP_OK);
-        if (s_valid) {
-            s_status = st;
+        // A gauge that is not ready keeps the last good reading; a PMU that
+        // stops answering does not.
+        if (err != ESP_ERR_INVALID_RESPONSE) {
+            taskENTER_CRITICAL(&s_mux);
+            s_valid = (err == ESP_OK);
+            if (s_valid) {
+                s_status = st;
+            }
+            taskEXIT_CRITICAL(&s_mux);
         }
-        taskEXIT_CRITICAL(&s_mux);
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }
