@@ -81,7 +81,7 @@ static void round_area_cb(lv_event_t *e)
 static lv_indev_t *touch_start(lv_display_t *display)
 {
     const i2c_master_bus_config_t bus_config = {
-        .i2c_port = -1,
+        .i2c_port = BOARD_PMU_I2C_PORT,
         .sda_io_num = BSP_I2C_SDA,
         .scl_io_num = BSP_I2C_SCL,
         .clk_source = I2C_CLK_SRC_DEFAULT,

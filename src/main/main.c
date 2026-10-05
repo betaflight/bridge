@@ -42,6 +42,7 @@
 #include "ota.h"
 #include "leds.h"
 #include "display.h"
+#include "battery.h"
 
 #if CONFIG_BRIDGE_ADC_VOLTAGE
 #include "adc_voltage.h"
@@ -73,6 +74,7 @@ void app_main(void)
     usb_cdc_host_start();
     leds_start();      // WiFi + FC-comms status LEDs (board-defined)
     display_start();   // LCD touch status UI (board-defined)
+    battery_start();   // after the display: the PMU shares its I2C bus
 
     // Everything came up: if we just booted a freshly-OTA'd image, confirm it
     // so the bootloader keeps it instead of rolling back on the next reset.

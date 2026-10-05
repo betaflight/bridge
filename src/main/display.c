@@ -41,6 +41,7 @@
 #include "bridge.h"
 #include "ws_serial.h"
 #include "ota.h"
+#include "battery.h"
 #include "version.h"
 
 static const char *TAG = "display";
@@ -71,6 +72,12 @@ static lv_obj_t *s_val_gw;
 static lv_obj_t *s_val_mask;
 static lv_obj_t *s_val_ap;
 static lv_obj_t *s_val_slot;
+
+// Status bar across the top.
+static lv_obj_t *s_bar_wifi;
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+static lv_obj_t *s_bar_bat;
+#endif
 
 // WiFi tab.
 static lv_obj_t *s_ap_list;
@@ -160,6 +167,31 @@ static void refresh_cb(lv_timer_t *timer)
     ota_running_info(slot, sizeof(slot), &valid);
     snprintf(buf, sizeof(buf), "%s %s", slot, valid ? "valid" : "pending verify");
     set_value(s_val_slot, buf, valid ? COL_UP : COL_WARN);
+
+    if (w.state == WIFI_STA_CONNECTED && w.rssi) {
+        snprintf(buf, sizeof(buf), LV_SYMBOL_WIFI " %d dBm", w.rssi);
+        set_value(s_bar_wifi, buf, w.rssi >= -60 ? COL_UP : COL_WARN);
+    } else if (w.ap_active) {
+        set_value(s_bar_wifi, LV_SYMBOL_WIFI " AP", COL_WARN);
+    } else {
+        set_value(s_bar_wifi, LV_SYMBOL_WIFI, COL_DOWN);
+    }
+
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+    battery_status_t bat;
+    if (battery_get(&bat) && bat.present) {
+        const char *level = bat.percent >= 90 ? LV_SYMBOL_BATTERY_FULL
+                          : bat.percent >= 65 ? LV_SYMBOL_BATTERY_3
+                          : bat.percent >= 40 ? LV_SYMBOL_BATTERY_2
+                          : bat.percent >= 15 ? LV_SYMBOL_BATTERY_1
+                          : LV_SYMBOL_BATTERY_EMPTY;
+        snprintf(buf, sizeof(buf), "%s%s %u.%02u V %u%%", bat.charging ? LV_SYMBOL_CHARGE : "", level,
+                 bat.mv / 1000, (bat.mv % 1000) / 10, bat.percent);
+        set_value(s_bar_bat, buf, bat.percent >= 30 ? COL_UP : COL_WARN);
+    } else {
+        set_value(s_bar_bat, LV_SYMBOL_BATTERY_EMPTY, COL_DOWN);
+    }
+#endif
 }
 
 // ---------------------------------------------------------------- WiFi tab
@@ -426,6 +458,30 @@ static void build_status_tab(lv_obj_t *tab)
     refresh_cb(NULL);
 }
 
+// Fixed strip of WiFi signal and, on boards with a monitor, battery. Opaque, so
+// content scrolling underneath stays out of it.
+static lv_obj_t *build_status_bar(lv_obj_t *parent)
+{
+    lv_obj_t *bar = lv_obj_create(parent);
+    lv_obj_set_size(bar, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(bar, lv_color_hex(COL_BG), 0);
+    lv_obj_set_style_border_width(bar, 0, 0);
+    lv_obj_set_style_radius(bar, 0, 0);
+    lv_obj_set_style_pad_hor(bar, 14, 0);
+    lv_obj_set_style_pad_ver(bar, 6, 0);
+    lv_obj_set_style_pad_column(bar, 18, 0);
+    lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
+    lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+
+    s_bar_wifi = lv_label_create(bar);
+    lv_label_set_text(s_bar_wifi, LV_SYMBOL_WIFI);
+#if CONFIG_BRIDGE_BATTERY_AXP2101
+    s_bar_bat = lv_label_create(bar);
+    lv_label_set_text(s_bar_bat, LV_SYMBOL_BATTERY_EMPTY);
+#endif
+    return bar;
+}
+
 #if CONFIG_BRIDGE_DISPLAY_ROUND
 
 static void build_wifi_tab(lv_obj_t *tab)
@@ -496,6 +552,14 @@ static void build_ui(void)
     lv_obj_set_style_bg_color(tv, lv_color_hex(COL_BG), 0);
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
 
+    // Before the tiles: it must exist for the first status refresh, and as a
+    // later sibling of the tileview it still draws over the scrolling content.
+    // Its content sits low enough in the band to clear the curve.
+    lv_obj_t *bar = build_status_bar(screen);
+    lv_obj_set_style_pad_top(bar, 30, 0);
+    lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(bar, LV_ALIGN_TOP_MID, 0, 0);
+
     lv_obj_t *tile_status = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
     lv_obj_t *tile_wifi   = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT);
     build_status_tab(tile_status);
@@ -561,7 +625,16 @@ static void build_ui(void)
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_hex(COL_BG), 0);
 
+    lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(screen, 0, 0);
+    lv_obj_set_style_pad_row(screen, 0, 0);
+
+    lv_obj_t *status_bar = build_status_bar(screen);
+    lv_obj_set_flex_align(status_bar, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
     lv_obj_t *tv = lv_tabview_create(screen);
+    lv_obj_set_width(tv, LV_PCT(100));
+    lv_obj_set_flex_grow(tv, 1);
     lv_tabview_set_tab_bar_size(tv, 52);
     lv_obj_set_style_bg_color(tv, lv_color_hex(COL_BG), 0);
 

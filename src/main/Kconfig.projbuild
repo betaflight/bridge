@@ -47,6 +47,15 @@ menu "Betaflight bridge"
             the status display. Requires the board to define BOARD_ADC_GPIO
             and BOARD_ADC_DIVIDER_RATIO and to provide adc_voltage.c.
 
+    config BRIDGE_BATTERY_AXP2101
+        bool "AXP2101 battery monitor"
+        default n
+        help
+            Read the LiPo voltage and fuel-gauge percentage from the board's
+            AXP2101 PMU and show them on the status display and web page.
+            Requires the board to define BOARD_PMU_I2C_PORT, the I2C port its
+            display code has already brought up with the PMU on it.
+
     config BRIDGE_WEB_I18N
         bool "Bilingual web UI"
         default n

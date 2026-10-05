@@ -32,3 +32,8 @@
 #pragma once
 
 #define BOARD_NAME "esp32s3-touch-lcd-4b"
+
+#include "sdkconfig.h"
+
+// The BSP's I2C bus, which also carries the AXP2101 PMU.
+#define BOARD_PMU_I2C_PORT CONFIG_BSP_I2C_NUM

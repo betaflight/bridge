@@ -104,7 +104,10 @@ and checked on OTA, so an image built for one board is refused on another (see
   shared between flashing/console and the USB-host bridge — **the serial
   console drops out once host mode engages**. UART0 (TX GPIO43 / RX GPIO44) is
   broken out on the header for a persistent log console. Power the board from
-  its DC terminal or battery input when the USB-C is hosting the FC.
+  its DC terminal or battery input when the USB-C is hosting the FC. A LiPo on
+  the battery input is read by the board's AXP2101 PMU, and its voltage and
+  charge are shown on the status page and web UI
+  (`CONFIG_BRIDGE_BATTERY_AXP2101`).
 - **LEDs:** none used — status is on the LCD.
 - **Partitions:** 16 MB dual-OTA, 6 MB per slot
   (`boards/esp32s3-touch-lcd-4b/partitions.csv`).
@@ -136,7 +139,8 @@ and checked on OTA, so an image built for one board is refused on another (see
   shared between flashing/console and the USB-host bridge — **the serial
   console drops out once host mode engages**. Run it from a 3.7 V LiPo on the
   MX1.25 battery header (AXP2101 PMU, PWR button) when the USB-C is hosting
-  the FC.
+  the FC. The status page and web UI show the cell's voltage and charge
+  (`CONFIG_BRIDGE_BATTERY_AXP2101`).
 - **LEDs:** none — status is on the display.
 - **Partitions:** 32 MB flash, dual-OTA with 6 MB per slot
   (`boards/esp32s3-touch-amoled-1-75c/partitions.csv`).
@@ -177,6 +181,10 @@ Boards with extra hardware may also add:
   by including a vendor BSP header or by declaring a local driver.
 - `CONFIG_BRIDGE_DISPLAY_ROUND` alongside `CONFIG_BRIDGE_DISPLAY_TOUCH` lays the
   touch UI out for a circular panel.
+- `CONFIG_BRIDGE_BATTERY_AXP2101` reads the LiPo voltage and charge from an
+  AXP2101 PMU and shows them on the display and web page. `board.h` must define
+  `BOARD_PMU_I2C_PORT`, the I2C port the display code brings up with the PMU on
+  it.
 - For `CONFIG_BRIDGE_DISPLAY_COMPACT` only, `display.c` also expects a
   `board_logo.h` defining an `lv_image_dsc_t board_logo`, and the LVGL fonts
   `ui_font_size14` and `ui_font_size24`. Register their `.c` files and the

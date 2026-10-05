@@ -25,6 +25,8 @@ CONFIG_APP_PROJECT_VER="esp32s3-touch-amoled-1-75c"
 # Native LVGL touch UI laid out for the round panel.
 CONFIG_BRIDGE_DISPLAY_TOUCH=y
 CONFIG_BRIDGE_DISPLAY_ROUND=y
+# 1S LiPo voltage and charge from the AXP2101.
+CONFIG_BRIDGE_BATTERY_AXP2101=y
 CONFIG_LV_COLOR_DEPTH_16=y
 # LVGL heap from PSRAM (devices/lv_mem_psram.c) rather than a 64 KB static
 # pool in DRAM, so internal RAM is left for the panel's DMA draw buffers.
