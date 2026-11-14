@@ -27,6 +27,8 @@ It is a transparent byte bridge — no MSP parsing happens on the ESP32.
 | `src/main/usb_cdc_host.c` | USB host + CDC-ACM; opens the FC VCP, pumps bytes |
 | `src/main/tcp_server.c` | TCP listener on 5761; one client at a time, newest connection wins |
 | `src/main/ws_serial.c` | WebSocket serial endpoint (`/serial`) for browser clients — ws:// and wss:// |
+| `src/main/ble_serial.c` | Bluetooth LE serial on the Nordic UART service, for phones without WiFi |
+| `src/main/usb_download.c` | USB flash mode: reboots into the ROM loader on a long BOOT press or from the touch UI |
 | `src/main/tls_cert.c` | Self-signed TLS cert generated on first boot, persisted in NVS |
 | `src/main/bridge_mdns.c` | mDNS responder: `betaflight-bridge-<mac>.local`, `_betaflight._tcp` service |
 | `src/main/wifi.c` | Station-first WiFi: joins a stored network, SoftAP fallback, creds in NVS |
@@ -367,6 +369,25 @@ Avahi browser) can find it without knowing the IP:
 avahi-browse -rt _betaflight._tcp
 ```
 
+### Bluetooth LE
+
+Every board also offers the serial stream over Bluetooth LE, so a phone can
+connect without any WiFi. The bridge advertises the Nordic UART service
+(`6E400001-B5A3-F393-E0A9-E50E24DCCA9E`) as **`Betaflight Bridge <mac6>`** (the
+same suffix as the mDNS hostname; the GAP device name matches).
+
+Clients disagree on which Nordic UART characteristic carries which direction, so
+both `6E400002` and `6E400003` accept writes (with or without response) and both
+notify: FC data goes out on whichever one the client subscribed to.
+Notifications are split at the negotiated MTU (247 requested), and the bridge
+asks for a 15-30 ms connection interval. There is no pairing.
+
+A Bluetooth client takes the FC over when it subscribes, like a new TCP or
+WebSocket connection, and is dropped when another client takes over. While the
+FC is being flashed it is refused. The status bar on display boards shows the
+Bluetooth mark (green with a client connected) and the client row says whether
+the app came in over WiFi or Bluetooth.
+
 ### Connecting from a browser (WebSocket / WSS)
 
 The desktop (Tauri) and Android (Capacitor) apps connect over the raw **TCP**
@@ -414,6 +435,21 @@ on the status page.
 > The partition table only takes effect from a flash over the wire, so the first
 > flash — `idf.py flash` or the factory image from a browser — is the last one
 > that needs the cable.
+
+### USB flash mode
+
+Boards with a single USB-C use it to host the FC, so it is not available to a PC
+for flashing. **Hold BOOT for three seconds** (or hold *USB flash mode* on the
+touch status page) and the bridge reboots into the ESP32-S3 ROM loader on that
+port, with a notice on the display. Flash with esptool and leave with a
+watchdog reset (a plain RTS reset returns to the loader):
+
+```sh
+esptool.py --chip esp32s3 -p <PORT> --before no_reset --after watchdog_reset \
+  write_flash 0x20000 dist/betaflight-bridge-<board>-<version>.bin
+```
+
+RESET also leaves USB flash mode.
 
 ## Flashing the flight controller
 
