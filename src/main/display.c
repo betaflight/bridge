@@ -22,6 +22,10 @@
 #include "display.h"
 #include "sdkconfig.h"
 
+#include <stdbool.h>
+
+static bool s_display_ready;
+
 #if CONFIG_BRIDGE_DISPLAY_TOUCH
 
 #include <stdio.h>
@@ -44,6 +48,7 @@
 #include "ota.h"
 #include "battery.h"
 #include "version.h"
+#include "usb_download.h"
 
 static const char *TAG = "display";
 
@@ -383,6 +388,12 @@ static void forget_clicked(lv_event_t *e)
     wifi_set_station("", "");
 }
 
+static void usb_mode_held(lv_event_t *e)
+{
+    (void)e;
+    usb_download_enter();
+}
+
 // ------------------------------------------------------------- UI assembly
 
 #if CONFIG_BRIDGE_DISPLAY_ROUND
@@ -474,6 +485,14 @@ static void build_status_tab(lv_obj_t *tab)
     lv_obj_t *ver = lv_label_create(tab);
     lv_label_set_text(ver, "betaflight-bridge " BRIDGE_VERSION);
     lv_obj_set_style_text_color(ver, lv_color_hex(COL_KEY), 0);
+
+    lv_obj_t *usb = lv_button_create(tab);
+    lv_obj_set_style_bg_color(usb, lv_color_hex(0x222831), 0);
+    lv_obj_set_style_margin_top(usb, 16, 0);
+    lv_obj_set_style_margin_bottom(usb, 16, 0);
+    lv_obj_t *ul = lv_label_create(usb);
+    lv_label_set_text(ul, LV_SYMBOL_USB " Hold for USB flash mode");
+    lv_obj_add_event_cb(usb, usb_mode_held, LV_EVENT_LONG_PRESSED, NULL);
 
     lv_timer_create(refresh_cb, REFRESH_MS, NULL);
     refresh_cb(NULL);
@@ -692,6 +711,7 @@ void display_start(void)
     lv_display_set_theme(lv_display_get_default(), theme);
     build_ui();
     bsp_display_unlock();
+    s_display_ready = true;
 
     s_scan_req = xSemaphoreCreateBinary();
     configASSERT(s_scan_req);
@@ -1012,6 +1032,7 @@ void display_start(void)
     bsp_display_lock(0);
     build_compact_ui();
     bsp_display_unlock();
+    s_display_ready = true;
 
     vTaskDelay(pdMS_TO_TICKS(200));
     bsp_display_backlight_on();
@@ -1021,5 +1042,40 @@ void display_start(void)
 #else  // no display on this board
 
 void display_start(void) { }
+
+#endif
+
+#if CONFIG_BRIDGE_DISPLAY_TOUCH || CONFIG_BRIDGE_DISPLAY_COMPACT
+
+void display_notice(const char *text)
+{
+    if (!s_display_ready || !bsp_display_lock(1000)) {
+        return;
+    }
+    lv_obj_t *box = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(box, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_bg_color(box, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(box, 0, 0);
+    lv_obj_set_style_radius(box, 0, 0);
+
+    lv_obj_t *label = lv_label_create(box);
+    lv_label_set_text(label, text);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(label, LV_PCT(80));
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(label, lv_color_white(), 0);
+    lv_obj_center(label);
+
+    lv_refr_now(NULL);
+    bsp_display_unlock();
+}
+
+#else
+
+void display_notice(const char *text)
+{
+    (void)text;
+}
 
 #endif
