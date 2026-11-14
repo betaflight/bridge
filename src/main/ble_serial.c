@@ -47,6 +47,11 @@
 #define TX_RETRY_MS 2
 #define TX_RETRY_LIMIT 100
 
+// Connection interval in 1.25 ms units, supervision timeout in 10 ms units.
+#define CONN_ITVL_MIN 12
+#define CONN_ITVL_MAX 24
+#define CONN_SUPERVISION_TIMEOUT 400
+
 // Nordic UART service. Clients disagree on which characteristic carries which
 // direction, so both accept writes and both notify: FC data goes out on
 // whichever one the client subscribed to.
@@ -139,6 +144,23 @@ static const struct ble_gatt_svc_def s_services[] = {
     {0},
 };
 
+// MSP is request/response, so each round trip costs a couple of connection
+// intervals; centrals tend to default to 30-50 ms. 15 ms is the shortest iOS
+// accepts.
+static void request_fast_interval(uint16_t conn)
+{
+    const struct ble_gap_upd_params params = {
+        .itvl_min = CONN_ITVL_MIN,
+        .itvl_max = CONN_ITVL_MAX,
+        .latency = 0,
+        .supervision_timeout = CONN_SUPERVISION_TIMEOUT,
+    };
+    int rc = ble_gap_update_params(conn, &params);
+    if (rc != 0) {
+        ESP_LOGW(TAG, "connection parameter update failed: %d", rc);
+    }
+}
+
 static void on_disconnect(void)
 {
     if (s_claimed && bridge_client_owner() == BRIDGE_CLIENT_BLE) {
@@ -162,6 +184,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         s_conn = event->connect.conn_handle;
         s_advertising = false;
         ESP_LOGI(TAG, "client connected");
+        request_fast_interval(event->connect.conn_handle);
         break;
 
     case BLE_GAP_EVENT_DISCONNECT:
@@ -182,6 +205,16 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             claim();
         } else if (s_claimed && bridge_client_owner() == BRIDGE_CLIENT_BLE) {
             bridge_release(BRIDGE_CLIENT_BLE);
+        }
+        break;
+
+    case BLE_GAP_EVENT_CONN_UPDATE:
+        if (event->conn_update.status == 0) {
+            struct ble_gap_conn_desc desc;
+            if (ble_gap_conn_find(event->conn_update.conn_handle, &desc) == 0) {
+                ESP_LOGI(TAG, "connection interval %u.%02u ms", desc.conn_itvl * 125 / 100,
+                         desc.conn_itvl * 125 % 100);
+            }
         }
         break;
 
