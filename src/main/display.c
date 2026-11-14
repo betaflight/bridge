@@ -631,6 +631,9 @@ static void build_ui(void)
 
     lv_obj_t *status_bar = build_status_bar(screen);
     lv_obj_set_flex_align(status_bar, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+#ifdef BSP_LCD_CORNER_INSET
+    lv_obj_set_style_pad_hor(status_bar, BSP_LCD_CORNER_INSET, 0);
+#endif
 
     lv_obj_t *tv = lv_tabview_create(screen);
     lv_obj_set_width(tv, LV_PCT(100));
