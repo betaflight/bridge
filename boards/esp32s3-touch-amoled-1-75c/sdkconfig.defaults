@@ -35,5 +35,8 @@ CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_16=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
 
-# NimBLE host allocations in PSRAM, leaving internal RAM to the controller.
+# Internal RAM is short once the BLE controller, USB host and panel DMA buffers
+# are up: NimBLE host, WiFi/lwIP buffers and TLS sessions go to PSRAM.
 CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
