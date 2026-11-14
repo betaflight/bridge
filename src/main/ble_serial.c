@@ -69,6 +69,9 @@ static char s_name[32];
 static uint8_t s_own_addr_type;
 
 static volatile uint16_t s_conn = BLE_HS_CONN_HANDLE_NONE;
+// Bumped on every connect and disconnect, so a send that started for one client
+// never reaches, or drops, the next.
+static volatile uint32_t s_conn_gen;
 static volatile bool s_rx_subscribed;
 static volatile bool s_tx_subscribed;
 static volatile bool s_claimed;
@@ -163,6 +166,7 @@ static void request_fast_interval(uint16_t conn)
 
 static void on_disconnect(void)
 {
+    s_conn_gen++;
     if (s_claimed && bridge_client_owner() == BRIDGE_CLIENT_BLE) {
         bridge_release(BRIDGE_CLIENT_BLE);
     }
@@ -181,6 +185,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             advertise();
             break;
         }
+        s_conn_gen++;
         s_conn = event->connect.conn_handle;
         s_advertising = false;
         ESP_LOGI(TAG, "client connected");
@@ -317,7 +322,8 @@ void ble_serial_start(void)
 
 void ble_serial_send(const uint8_t *data, size_t len)
 {
-    while (len > 0) {
+    const uint32_t gen = s_conn_gen;
+    while (len > 0 && gen == s_conn_gen) {
         const uint16_t conn = s_conn;
         const uint16_t handle = s_tx_subscribed ? s_tx_handle : s_rx_subscribed ? s_rx_handle : 0;
         if (conn == BLE_HS_CONN_HANDLE_NONE || handle == 0) {
@@ -333,7 +339,7 @@ void ble_serial_send(const uint8_t *data, size_t len)
         }
 
         int rc = BLE_HS_ENOMEM;
-        for (int tries = 0; rc == BLE_HS_ENOMEM && tries < TX_RETRY_LIMIT; tries++) {
+        for (int tries = 0; rc == BLE_HS_ENOMEM && tries < TX_RETRY_LIMIT && gen == s_conn_gen; tries++) {
             struct os_mbuf *om = ble_hs_mbuf_from_flat(data, chunk);
             rc = om ? ble_gatts_notify_custom(conn, handle, om) : BLE_HS_ENOMEM;
             if (rc == BLE_HS_ENOMEM) {
@@ -341,13 +347,20 @@ void ble_serial_send(const uint8_t *data, size_t len)
             }
         }
         if (rc != 0) {
-            ESP_LOGW(TAG, "notify failed: %d; dropping client", rc);
-            terminate();
+            if (gen == s_conn_gen) {
+                ESP_LOGW(TAG, "notify failed: %d; dropping client", rc);
+                terminate();
+            }
             return;
         }
         data += chunk;
         len -= chunk;
     }
+}
+
+void ble_serial_kick(void)
+{
+    terminate();
 }
 
 ble_serial_state_t ble_serial_state(void)
@@ -375,6 +388,10 @@ void ble_serial_poll(void)
 #else
 
 void ble_serial_start(void)
+{
+}
+
+void ble_serial_kick(void)
 {
 }
 

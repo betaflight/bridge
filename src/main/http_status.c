@@ -28,6 +28,7 @@
 #include "fc_flash.h"
 #include "dfu_host.h"
 #include "ws_serial.h"
+#include "ble_serial.h"
 #include "tls_cert.h"
 #include "bridge.h"
 #include "version.h"
@@ -624,7 +625,7 @@ static esp_err_t status_get(httpd_req_t *req)
         "\"ota\":{\"board\":\"%s\",\"slot\":\"%s\",\"valid\":%s}%s}",
         usb ? "true" : "false", vid, pid,
         in_dfu ? "true" : "false", in_dfu ? dfu.vid : 0, in_dfu ? dfu.pid : 0,
-        (owner == BRIDGE_CLIENT_TCP || owner == BRIDGE_CLIENT_WS) ? "true" : "false",
+        (owner == BRIDGE_CLIENT_TCP || owner == BRIDGE_CLIENT_WS || owner == BRIDGE_CLIENT_BLE) ? "true" : "false",
         via, TCP_SERVER_PORT,
         state, w.ap_active ? "true" : "false", ssid_esc, bridge_mdns_hostname(),
         w.ip, w.gw, w.netmask, w.rssi,
@@ -684,6 +685,7 @@ static esp_err_t disconnect_post(httpd_req_t *req)
     ESP_LOGI(TAG, "web request to disconnect client");
     tcp_server_kick();
     ws_serial_kick();
+    ble_serial_kick();
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }

@@ -441,10 +441,13 @@ on the status page.
 Boards with a single USB-C use it to host the FC, so it is not available to a PC
 for flashing. **Hold BOOT for three seconds** (or hold *USB flash mode* on the
 touch status page) and the bridge reboots into the ESP32-S3 ROM loader on that
-port, with a notice on the display. Flash with esptool and leave with a
-watchdog reset (a plain RTS reset returns to the loader):
+port, with a notice on the display. Flash with esptool, erasing `otadata` so
+the image in `ota_0` boots even if an earlier OTA left `ota_1` selected, and
+leave with a watchdog reset (a plain RTS reset returns to the loader):
 
 ```sh
+esptool.py --chip esp32s3 -p <PORT> --before no_reset --after no_reset \
+  erase_region 0xf000 0x2000
 esptool.py --chip esp32s3 -p <PORT> --before no_reset --after watchdog_reset \
   write_flash 0x20000 dist/betaflight-bridge-<board>-<version>.bin
 ```

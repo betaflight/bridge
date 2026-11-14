@@ -41,6 +41,9 @@ void ble_serial_start(void);
 // single net TX pump while a BLE client owns the bridge.
 void ble_serial_send(const uint8_t *data, size_t len);
 
+// Drop the connected BLE client, if any; the disconnect releases the bridge.
+void ble_serial_kick(void);
+
 // Whether BLE is up, and whether a client is connected.
 ble_serial_state_t ble_serial_state(void);
 
