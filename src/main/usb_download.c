@@ -68,5 +68,6 @@ void usb_download_start(void)
         ESP_LOGE(TAG, "BOOT button setup failed");
         return;
     }
-    xTaskCreate(boot_button_task, "boot_btn", 2048, NULL, 2, NULL);
+    BaseType_t ok = xTaskCreate(boot_button_task, "boot_btn", 2048, NULL, 2, NULL);
+    configASSERT(ok == pdPASS);
 }
