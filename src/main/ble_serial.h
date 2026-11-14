@@ -1,0 +1,40 @@
+/*
+ * This file is part of Betaflight.
+ *
+ * Betaflight is free software. You can redistribute this software
+ * and/or modify this software under the terms of the GNU General
+ * Public License as published by the Free Software Foundation,
+ * either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * Betaflight is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// Bluetooth LE serial on the Nordic UART service, so a phone can reach the FC
+// without WiFi. One client at a time; it takes over the bridge when it
+// subscribes, like a new TCP or WebSocket connection does.
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+// Bring up the BLE host and start advertising. Call after wifi_start(): the
+// device name carries the WiFi station MAC suffix, as the mDNS hostname does.
+void ble_serial_start(void);
+
+// Send FC bytes to the subscribed BLE client (no-op if none). Called by the
+// single net TX pump while a BLE client owns the bridge.
+void ble_serial_send(const uint8_t *data, size_t len);
+
+// Drop the BLE client if another transport has taken the bridge from it.
+// Called periodically by the net TX pump.
+void ble_serial_poll(void);

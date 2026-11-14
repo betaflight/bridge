@@ -33,13 +33,14 @@
 void bridge_init(void);
 
 // Which transport currently owns the FC byte stream. Only one client bridges
-// at a time, shared across the raw-TCP server and the WebSocket endpoint (the
-// stream buffers are single-consumer). A new connection on either transport
-// takes over: the transports kick the current owner and bridge_claim().
+// at a time, shared across the raw-TCP server, the WebSocket endpoint and BLE
+// serial (the stream buffers are single-consumer). A new connection on any
+// transport takes over: the transports kick the current owner and bridge_claim().
 typedef enum {
     BRIDGE_CLIENT_NONE = 0,
     BRIDGE_CLIENT_TCP,
     BRIDGE_CLIENT_WS,
+    BRIDGE_CLIENT_BLE,
     BRIDGE_CLIENT_FLASH,   // the firmware flasher, which locks the others out
 } bridge_client_t;
 

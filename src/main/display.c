@@ -117,6 +117,8 @@ static void refresh_cb(lv_timer_t *timer)
     } else if (owner == BRIDGE_CLIENT_WS) {
         snprintf(buf, sizeof(buf), "connected WebSocket (%s)", ws_serial_is_secure() ? "wss" : "ws");
         set_value(s_val_cfg, buf, COL_UP);
+    } else if (owner == BRIDGE_CLIENT_BLE) {
+        set_value(s_val_cfg, "connected Bluetooth", COL_UP);
     } else {
         set_value(s_val_cfg, "none", COL_DOWN);
     }
@@ -803,6 +805,8 @@ static void compact_refresh_cb(lv_timer_t *timer)
         set_value(s_compact_client, "TCP", COL_UP);
     } else if (owner == BRIDGE_CLIENT_WS) {
         set_value(s_compact_client, ws_serial_is_secure() ? "WSS" : "WS", COL_UP);
+    } else if (owner == BRIDGE_CLIENT_BLE) {
+        set_value(s_compact_client, "BLE", COL_UP);
     } else {
         set_value(s_compact_client, "NONE", COL_DOWN);
     }
