@@ -1,0 +1,38 @@
+# Waveshare ESP32-S3-Touch-AMOLED-1.8 (ESP32-S3R8, 16 MB flash)
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/esp32s3-touch-amoled-1-8/partitions.csv"
+
+# 8 MB octal PSRAM.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# No USB-UART bridge on this board: console on the native USB-Serial-JTAG
+# (drops out once USB host mode engages).
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Board identity baked into the image and checked on OTA.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="esp32s3-touch-amoled-1-8"
+
+# Native LVGL touch UI.
+CONFIG_BRIDGE_DISPLAY_TOUCH=y
+# 1S LiPo voltage and charge from the AXP2101.
+CONFIG_BRIDGE_BATTERY_AXP2101=y
+CONFIG_LV_COLOR_DEPTH_16=y
+# LVGL heap from PSRAM (devices/lv_mem_psram.c) rather than a 64 KB static
+# pool in DRAM, so internal RAM is left for the panel's DMA draw buffers.
+CONFIG_LV_USE_CUSTOM_MALLOC=y
+CONFIG_LV_FONT_MONTSERRAT_14=y
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+# The CST816 does not answer I2C until it is touched, so its driver must not
+# read the chip ID during init.
+CONFIG_ESP_LCD_TOUCH_CST816S_DISABLE_READ_ID=y

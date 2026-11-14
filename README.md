@@ -60,6 +60,7 @@ fonts, logos, managed components — stays there. The USB-host pins
 | `esp32s3-touch-lcd-4b` | 16 MB | 8 MB octal | single (native) | 4" LCD touch UI |
 | `esp32s3-hglrc-a1` | 4 MB | — | dual | NeoPixel (GPIO48) + 1.47" LCD |
 | `esp32s3-touch-amoled-1-75c` | 32 MB | 8 MB octal | single (native) | 1.75" round AMOLED touch UI |
+| `esp32s3-touch-amoled-1-8` | 16 MB | 8 MB octal | single (native) | 1.8" AMOLED touch UI |
 
 A board identity (`BOARD_NAME`) is baked into each image (`esp_app_desc.version`)
 and checked on OTA, so an image built for one board is refused on another (see
@@ -146,6 +147,23 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **LEDs:** none — status is on the display.
 - **Partitions:** 32 MB flash, dual-OTA with 6 MB per slot
   (`boards/esp32s3-touch-amoled-1-75c/partitions.csv`).
+
+### `esp32s3-touch-amoled-1-8` — [Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/esp32-s3-touch-amoled-1.8.htm)
+
+- **MCU / memory:** ESP32-S3R8 — 16 MB flash, 8 MB **octal** PSRAM.
+- **Display:** 1.8" 368×448 AMOLED (QSPI) with capacitive touch, driven
+  directly with LVGL (`CONFIG_BRIDGE_DISPLAY_TOUCH`), using the rectangular
+  tabbed layout of the 4" board. Two hardware revisions ship under this name,
+  SH8601 + FT3168 and CO5300 + CST816; whether an FT3168 answers at boot
+  selects the panel offset and touch driver. Panel and touch resets are on a TCA9554 I/O expander.
+- **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
+  shared between flashing/console and the USB-host bridge — **the serial
+  console drops out once host mode engages**. Run it from a 3.7 V LiPo on the
+  MX1.25 battery header (AXP2101 PMU) when the USB-C is hosting the FC
+  (`CONFIG_BRIDGE_BATTERY_AXP2101`).
+- **LEDs:** none — status is on the display.
+- **Partitions:** 16 MB flash, dual-OTA with 6 MB per slot
+  (`boards/esp32s3-touch-amoled-1-8/partitions.csv`).
 
 ### Status LED behaviour
 

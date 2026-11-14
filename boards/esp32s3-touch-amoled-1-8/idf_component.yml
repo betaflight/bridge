@@ -1,0 +1,14 @@
+# Managed components needed only by this board. Only the selected board's
+# directory is added to the build, so nothing here is fetched for other boards.
+dependencies:
+  # Public: board_display.h exposes LVGL types to the shared display code.
+  lvgl/lvgl:
+    version: "^9.2.0"
+    public: true
+  # LVGL <-> esp_lcd glue, panel and touch drivers for the directly driven
+  # AMOLED. The CO5300 driver also runs the SH8601 on the original board;
+  # FT3168 (original) and CST816 (later revision) touch are detected at boot.
+  espressif/esp_lvgl_port: "^2.8.0~1"
+  espressif/esp_lcd_co5300: "^2.2.0"
+  espressif/esp_lcd_touch_ft5x06: "^1.1.0~1"
+  espressif/esp_lcd_touch_cst816s: "^1.1.1~1"
