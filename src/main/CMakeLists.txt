@@ -5,6 +5,7 @@ idf_component_register(
         "main.c"
         "wifi.c"
         "tcp_server.c"
+        "ble_serial.c"
         "usb_cdc_host.c"
         "dfu_host.c"
         "dfu_layout.c"
@@ -28,6 +29,7 @@ idf_component_register(
     REQUIRES
         "${board}"                              # board.h, board_display.h, board peripherals
         esp_wifi
+        bt
         esp_netif
         esp_event
         nvs_flash

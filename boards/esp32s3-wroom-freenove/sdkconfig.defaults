@@ -12,3 +12,6 @@ CONFIG_SPIRAM_MODE_OCT=y
 # Board identity (see esp32s3-zero notes).
 CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
 CONFIG_APP_PROJECT_VER="esp32s3-wroom-freenove"
+
+# NimBLE host allocations in PSRAM, leaving internal RAM to the controller.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y

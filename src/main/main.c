@@ -37,6 +37,7 @@
 #include "bridge.h"
 #include "wifi.h"
 #include "tcp_server.h"
+#include "ble_serial.h"
 #include "usb_cdc_host.h"
 #include "http_status.h"
 #include "ota.h"
@@ -69,6 +70,7 @@ void app_main(void)
 
     bridge_init();
     wifi_start();
+    ble_serial_start();
     http_status_start();
     tcp_server_start();
     usb_cdc_host_start();

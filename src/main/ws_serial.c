@@ -22,6 +22,7 @@
 #include "ws_serial.h"
 #include "bridge.h"
 #include "tcp_server.h"
+#include "ble_serial.h"
 #include "fc_cli.h"
 
 #include <stdlib.h>
@@ -124,6 +125,7 @@ static void net_tx_task(void *arg)
             s_closing_fd = s_fd;
             httpd_sess_trigger_close(s_hd, s_fd);
         }
+        ble_serial_poll();
 
         size_t n = bridge_usb_to_net_pop(buf, sizeof(buf), 100);
         if (n == 0) {
@@ -135,6 +137,9 @@ static void net_tx_task(void *arg)
             break;
         case BRIDGE_CLIENT_WS:
             ws_send(buf, n);
+            break;
+        case BRIDGE_CLIENT_BLE:
+            ble_serial_send(buf, n);
             break;
         case BRIDGE_CLIENT_FLASH:
             // The flasher is talking to the FC's CLI. This stays the single
