@@ -54,6 +54,8 @@ CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
 CONFIG_BT_NIMBLE_SECURITY_ENABLE=n
 CONFIG_BT_NIMBLE_NVS_PERSIST=n
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
+# One advertising set and one connection.
+CONFIG_BT_CTRL_BLE_MAX_ACT=2
 
 # --- lwIP ---
 # Disable Nagle so small MSP frames are flushed immediately (low latency).
