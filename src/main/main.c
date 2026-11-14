@@ -38,6 +38,7 @@
 #include "wifi.h"
 #include "tcp_server.h"
 #include "ble_serial.h"
+#include "usb_download.h"
 #include "usb_cdc_host.h"
 #include "http_status.h"
 #include "ota.h"
@@ -77,6 +78,7 @@ void app_main(void)
     leds_start();      // WiFi + FC-comms status LEDs (board-defined)
     display_start();   // LCD touch status UI (board-defined)
     battery_start();   // after the display: the PMU shares its I2C bus
+    usb_download_start();
 
     // Everything came up: if we just booted a freshly-OTA'd image, confirm it
     // so the bootloader keeps it instead of rolling back on the next reset.

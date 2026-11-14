@@ -6,6 +6,7 @@ idf_component_register(
         "wifi.c"
         "tcp_server.c"
         "ble_serial.c"
+        "usb_download.c"
         "usb_cdc_host.c"
         "dfu_host.c"
         "dfu_layout.c"

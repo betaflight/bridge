@@ -27,3 +27,7 @@
 #pragma once
 
 void display_start(void);
+
+// Replace the screen with a full-screen notice, drawn before returning. For a
+// last message before a reboot; no-op without a display.
+void display_notice(const char *text);
