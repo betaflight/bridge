@@ -68,6 +68,7 @@ static volatile bool s_rx_subscribed;
 static volatile bool s_tx_subscribed;
 static volatile bool s_claimed;
 static volatile bool s_terminating;
+static volatile bool s_advertising;
 
 static void advertise(void);
 
@@ -159,6 +160,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             break;
         }
         s_conn = event->connect.conn_handle;
+        s_advertising = false;
         ESP_LOGI(TAG, "client connected");
         break;
 
@@ -223,7 +225,9 @@ static void advertise(void)
     if (rc == 0) {
         rc = ble_gap_adv_start(s_own_addr_type, NULL, BLE_HS_FOREVER, &params, gap_event, NULL);
     }
-    if (rc != 0 && rc != BLE_HS_EALREADY) {
+    if (rc == 0 || rc == BLE_HS_EALREADY) {
+        s_advertising = true;
+    } else {
         ESP_LOGE(TAG, "advertising failed: %d", rc);
     }
 }
@@ -313,6 +317,19 @@ void ble_serial_send(const uint8_t *data, size_t len)
     }
 }
 
+ble_serial_state_t ble_serial_state(void)
+{
+    if (s_conn != BLE_HS_CONN_HANDLE_NONE) {
+        return BLE_SERIAL_CONNECTED;
+    }
+    return s_advertising ? BLE_SERIAL_ADVERTISING : BLE_SERIAL_OFF;
+}
+
+const char *ble_serial_name(void)
+{
+    return s_name;
+}
+
 void ble_serial_poll(void)
 {
     if (s_conn != BLE_HS_CONN_HANDLE_NONE && s_claimed && !s_terminating &&
@@ -326,6 +343,16 @@ void ble_serial_poll(void)
 
 void ble_serial_start(void)
 {
+}
+
+ble_serial_state_t ble_serial_state(void)
+{
+    return BLE_SERIAL_OFF;
+}
+
+const char *ble_serial_name(void)
+{
+    return "";
 }
 
 void ble_serial_send(const uint8_t *data, size_t len)

@@ -40,6 +40,7 @@
 #include "tcp_server.h"
 #include "bridge.h"
 #include "ws_serial.h"
+#include "ble_serial.h"
 #include "ota.h"
 #include "battery.h"
 #include "version.h"
@@ -71,9 +72,11 @@ static lv_obj_t *s_val_url;
 static lv_obj_t *s_val_gw;
 static lv_obj_t *s_val_mask;
 static lv_obj_t *s_val_ap;
+static lv_obj_t *s_val_ble;
 static lv_obj_t *s_val_slot;
 
 // Status bar across the top.
+static lv_obj_t *s_bar_ble;
 static lv_obj_t *s_bar_wifi;
 #if CONFIG_BRIDGE_BATTERY_AXP2101
 static lv_obj_t *s_bar_bat;
@@ -112,13 +115,13 @@ static void refresh_cb(lv_timer_t *timer)
 
     bridge_client_t owner = bridge_client_owner();
     if (owner == BRIDGE_CLIENT_TCP) {
-        snprintf(buf, sizeof(buf), "connected TCP :%d", TCP_SERVER_PORT);
+        snprintf(buf, sizeof(buf), "WiFi, TCP :%d", TCP_SERVER_PORT);
         set_value(s_val_cfg, buf, COL_UP);
     } else if (owner == BRIDGE_CLIENT_WS) {
-        snprintf(buf, sizeof(buf), "connected WebSocket (%s)", ws_serial_is_secure() ? "wss" : "ws");
+        snprintf(buf, sizeof(buf), "WiFi, WebSocket (%s)", ws_serial_is_secure() ? "wss" : "ws");
         set_value(s_val_cfg, buf, COL_UP);
     } else if (owner == BRIDGE_CLIENT_BLE) {
-        set_value(s_val_cfg, "connected Bluetooth", COL_UP);
+        set_value(s_val_cfg, "Bluetooth", COL_UP);
     } else {
         set_value(s_val_cfg, "none", COL_DOWN);
     }
@@ -162,6 +165,21 @@ static void refresh_cb(lv_timer_t *timer)
         set_value(s_val_ap, "broadcasting (setup mode)", COL_WARN);
     } else {
         set_value(s_val_ap, "off", COL_DOWN);
+    }
+
+    switch (ble_serial_state()) {
+    case BLE_SERIAL_CONNECTED:
+        set_value(s_val_ble, "client connected", COL_UP);
+        set_value(s_bar_ble, LV_SYMBOL_BLUETOOTH, COL_UP);
+        break;
+    case BLE_SERIAL_ADVERTISING:
+        set_value(s_val_ble, ble_serial_name(), COL_MONO);
+        set_value(s_bar_ble, LV_SYMBOL_BLUETOOTH, COL_TEXT);
+        break;
+    default:
+        set_value(s_val_ble, "off", COL_DOWN);
+        set_value(s_bar_ble, "", COL_DOWN);
+        break;
     }
 
     char slot[16];
@@ -448,6 +466,7 @@ static void build_status_tab(lv_obj_t *tab)
     s_val_gw   = add_row(tab, "Gateway");
     s_val_mask = add_row(tab, "Netmask");
     s_val_ap   = add_row(tab, "Access point");
+    s_val_ble  = add_row(tab, "Bluetooth");
     lv_obj_t *board = add_row(tab, "Board");
     set_value(board, ota_board_id(), COL_MONO);
     s_val_slot = add_row(tab, "Firmware slot");
@@ -474,6 +493,9 @@ static lv_obj_t *build_status_bar(lv_obj_t *parent)
     lv_obj_set_style_pad_column(bar, 18, 0);
     lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
     lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+
+    s_bar_ble = lv_label_create(bar);
+    lv_label_set_text(s_bar_ble, "");
 
     s_bar_wifi = lv_label_create(bar);
     lv_label_set_text(s_bar_wifi, LV_SYMBOL_WIFI);
@@ -702,6 +724,7 @@ void display_start(void)
 #include "tcp_server.h"
 #include "bridge.h"
 #include "ws_serial.h"
+#include "ble_serial.h"
 
 LV_FONT_DECLARE(ui_font_size14);
 LV_FONT_DECLARE(ui_font_size24);
