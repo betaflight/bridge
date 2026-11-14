@@ -23,7 +23,8 @@
 // AMOLED over QSPI with capacitive touch, driven by devices/lcd_amoled.c
 // (enabled via CONFIG_BRIDGE_DISPLAY_TOUCH in this board's sdkconfig.defaults).
 // Two hardware revisions ship under the same name: SH8601 panel + FT3168 touch,
-// and CO5300 panel + CST816 touch. The touch chip identifies the revision.
+// and CO5300 panel + CST816 touch. An FT3168 answering on I2C identifies the
+// first.
 // Panel and touch resets are on a TCA9554 I/O expander; the AXP2101 PMU is
 // left at its power-on defaults, which already enable the panel and touch rails.
 //

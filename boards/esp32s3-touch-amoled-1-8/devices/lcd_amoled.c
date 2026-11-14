@@ -128,19 +128,21 @@ typedef struct {
     uint16_t x_gap;
 } touch_variant_t;
 
+// The CST816 only answers I2C for a short while after a touch, so it cannot be
+// probed for. The FT3168 always answers: its absence means the CST816/CO5300
+// revision.
 static const touch_variant_t *touch_detect(i2c_master_bus_handle_t bus)
 {
-    static const touch_variant_t variants[] = {
-        {"FT3168", ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG(), esp_lcd_touch_new_i2c_ft5x06, 0},
-        {"CST816", ESP_LCD_TOUCH_IO_I2C_CST816S_CONFIG(), esp_lcd_touch_new_i2c_cst816s, BSP_LCD_X_GAP_CO5300},
+    static const touch_variant_t ft3168 = {
+        "FT3168", ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG(), esp_lcd_touch_new_i2c_ft5x06, 0,
     };
-    for (size_t i = 0; i < sizeof(variants) / sizeof(variants[0]); i++) {
-        if (i2c_master_probe(bus, variants[i].io_config.dev_addr, I2C_TIMEOUT_MS) == ESP_OK) {
-            ESP_LOGI(TAG, "%s touch at 0x%02x", variants[i].name, (unsigned)variants[i].io_config.dev_addr);
-            return &variants[i];
-        }
-    }
-    return NULL;
+    static const touch_variant_t cst816 = {
+        "CST816", ESP_LCD_TOUCH_IO_I2C_CST816S_CONFIG(), esp_lcd_touch_new_i2c_cst816s, BSP_LCD_X_GAP_CO5300,
+    };
+    const touch_variant_t *variant =
+        i2c_master_probe(bus, ft3168.io_config.dev_addr, I2C_TIMEOUT_MS) == ESP_OK ? &ft3168 : &cst816;
+    ESP_LOGI(TAG, "%s touch revision", variant->name);
+    return variant;
 }
 
 static lv_indev_t *touch_start(lv_display_t *display, i2c_master_bus_handle_t bus,
@@ -200,9 +202,6 @@ lv_display_t *bsp_display_start(void)
         ESP_LOGW(TAG, "TCA9554 panel reset failed: %s", esp_err_to_name(err));
     }
     const touch_variant_t *touch = touch_detect(i2c);
-    if (!touch) {
-        ESP_LOGW(TAG, "no touch controller found; assuming the SH8601 panel");
-    }
 
     const spi_bus_config_t bus_config = CO5300_PANEL_BUS_QSPI_CONFIG(
         BSP_LCD_PCLK, BSP_LCD_DATA0, BSP_LCD_DATA1, BSP_LCD_DATA2, BSP_LCD_DATA3,
@@ -240,7 +239,7 @@ lv_display_t *bsp_display_start(void)
         err = esp_lcd_panel_init(panel);
     }
     if (err == ESP_OK) {
-        err = esp_lcd_panel_set_gap(panel, touch ? touch->x_gap : 0, 0);
+        err = esp_lcd_panel_set_gap(panel, touch->x_gap, 0);
     }
     if (err == ESP_OK) {
         err = esp_lcd_panel_disp_on_off(panel, true);
@@ -279,7 +278,7 @@ lv_display_t *bsp_display_start(void)
     lv_display_add_event_cb(s_display, round_area_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     lvgl_port_unlock();
 
-    if (!touch || !touch_start(s_display, i2c, touch)) {
+    if (!touch_start(s_display, i2c, touch)) {
         ESP_LOGW(TAG, "touch unavailable; display is read-only");
     }
 

@@ -33,3 +33,6 @@ CONFIG_LV_USE_CUSTOM_MALLOC=y
 CONFIG_LV_FONT_MONTSERRAT_14=y
 CONFIG_LV_FONT_MONTSERRAT_16=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
+# The CST816 does not answer I2C until it is touched, so its driver must not
+# read the chip ID during init.
+CONFIG_ESP_LCD_TOUCH_CST816S_DISABLE_READ_ID=y

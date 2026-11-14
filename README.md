@@ -152,8 +152,8 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **Display:** 1.8" 368×448 AMOLED (QSPI) with capacitive touch, driven
   directly with LVGL (`CONFIG_BRIDGE_DISPLAY_TOUCH`), using the rectangular
   tabbed layout of the 4" board. Two hardware revisions ship under this name,
-  SH8601 + FT3168 and CO5300 + CST816; the touch chip found at boot selects the
-  panel offset. Panel and touch resets are on a TCA9554 I/O expander.
+  SH8601 + FT3168 and CO5300 + CST816; whether an FT3168 answers at boot
+  selects the panel offset and touch driver. Panel and touch resets are on a TCA9554 I/O expander.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
   console drops out once host mode engages**. Run it from a 3.7 V LiPo on the
