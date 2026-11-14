@@ -27,6 +27,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef enum {
+    BLE_SERIAL_OFF = 0,
+    BLE_SERIAL_ADVERTISING,
+    BLE_SERIAL_CONNECTED,
+} ble_serial_state_t;
+
 // Bring up the BLE host and start advertising. Call after wifi_start(): the
 // device name carries the WiFi station MAC suffix, as the mDNS hostname does.
 void ble_serial_start(void);
@@ -34,6 +40,13 @@ void ble_serial_start(void);
 // Send FC bytes to the subscribed BLE client (no-op if none). Called by the
 // single net TX pump while a BLE client owns the bridge.
 void ble_serial_send(const uint8_t *data, size_t len);
+
+// Whether BLE is up, and whether a client is connected.
+ble_serial_state_t ble_serial_state(void);
+
+// The name the bridge advertises, e.g. "Betaflight Bridge a1b2c3" (empty when
+// BLE is off).
+const char *ble_serial_name(void);
 
 // Drop the BLE client if another transport has taken the bridge from it.
 // Called periodically by the net TX pump.
