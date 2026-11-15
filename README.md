@@ -362,8 +362,10 @@ up its own SoftAP so you can set it up:
    immediately — the status panel shows the assigned IP and netmask. The SoftAP
    stays up for 30 s after the join so you can note the new address, then
    stops.
-4. In the app choose the **TCP** connection, host `192.168.4.1`, port
-   `5761` (or the station IP once joined).
+4. In the app's **Options**, turn on expert mode and **Enable manual
+   connection mode**.
+5. Pick **Manual Selection** and enter `tcp://192.168.4.1:5761` (or the
+   station IP once joined).
 
 After a network is stored, **subsequent boots join it directly as a station and
 the SoftAP is not started** — reach the web UI and the app at the IP your
