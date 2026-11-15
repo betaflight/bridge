@@ -246,7 +246,7 @@ static bool flush_stage(job_t *j)
     // The device derives each block's address from the pointer set earlier plus
     // the block number, so the pointer has to be re-established whenever that
     // arithmetic is interrupted: at the start of a run, and after an erase.
-    // Erasing between data blocks is peculiar to streaming - Configurator
+    // Erasing between data blocks is peculiar to streaming - the app
     // erases everything up front - and skipping this re-set silently writes
     // the rest of the run to the wrong place.
     if (new_run || erased_now) {

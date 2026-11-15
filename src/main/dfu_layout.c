@@ -27,7 +27,7 @@
 #define DESC_MAX  256
 
 // Bootloaders that misreport their own geometry. Each entry replaces the whole
-// string; these are carried over from Configurator, which has had to live with
+// string; these are carried over from the app, which has had to live with
 // them in the field.
 static const struct {
     const char *broken;
@@ -71,7 +71,7 @@ static void sanitise(const char *src, char *dst, size_t dst_len)
 }
 
 // "Internal Flash" -> "internal_flash". Only the first space becomes an
-// underscore, matching Configurator: "@Option Bytes" keys as "option_bytes".
+// underscore, matching the app: "@Option Bytes" keys as "option_bytes".
 static void normalise_name(const char *src, char *dst, size_t dst_len)
 {
     while (*src == ' ') {
@@ -102,7 +102,7 @@ static void normalise_name(const char *src, char *dst, size_t dst_len)
 
 // Page sizes are written as "128Kg", "0002Kg", "4096 g" - a decimal count, an
 // optional K/M multiplier, then a one-character access code. The multiplier is
-// the second-to-last character, and M is treated as K: Configurator has always
+// the second-to-last character, and M is treated as K: the app has always
 // multiplied both by 1024 and real descriptors rely on that reading.
 static bool parse_page_size(const char *spec, uint32_t *out)
 {
@@ -135,7 +135,7 @@ bool dfu_layout_parse_region(const char *desc, uint8_t alt, dfu_region_t *out)
     }
 
     // Split on '/' and keep the first three fields. G474 reports a second
-    // option-byte bank as a fourth and fifth field; Configurator discards them
+    // option-byte bank as a fourth and fifth field; the app discards them
     // and so do we.
     char *name = buf + 1;
     char *addr_field = strchr(name, '/');
@@ -215,7 +215,7 @@ void dfu_layout_add(dfu_layout_t *layout, const dfu_region_t *region)
         return;
     }
     // Alternate settings repeat a region when a device exposes it more than
-    // once; the first wins, as it does in Configurator.
+    // once; the first wins, as it does in the app.
     if (dfu_layout_find(layout, region->name)) {
         return;
     }

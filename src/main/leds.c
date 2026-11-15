@@ -97,7 +97,7 @@ static void led_task(void *arg)
         // Otherwise it encodes the FC link on the OTG port:
         //   dim red   - no FC attached
         //   amber     - FC VCP open, idle
-        //   green     - FC + Configurator (TCP) linked
+        //   green     - FC + app (TCP) linked
         //   blue flash- bytes moving to/from the FC
         bool usb = usb_cdc_host_is_connected();
         uint32_t activity = bridge_fc_activity();

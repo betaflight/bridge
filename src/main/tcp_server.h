@@ -19,7 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// TCP server that Betaflight Configurator connects to (TCP transport, MSP over a
+// TCP server that the Betaflight app connects to (TCP transport, MSP over a
 // raw stream). One client at a time is bridged to the FC VCP; a new connection
 // takes over from the current one (TCP or WebSocket).
 #pragma once
@@ -28,7 +28,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Default listen port. Matches Betaflight SITL / Configurator's TCP default.
+// Default listen port. Matches Betaflight SITL / the app's TCP default.
 #ifndef TCP_SERVER_PORT
 #define TCP_SERVER_PORT  5761
 #endif
@@ -36,7 +36,7 @@
 // Spawn the listener/accept/RX task. Returns immediately.
 void tcp_server_start(void);
 
-// True while a Configurator client is connected.
+// True while an app client is connected.
 bool tcp_server_client_connected(void);
 
 // Drop the connected client, if any. The serve loop notices and releases the

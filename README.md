@@ -4,11 +4,11 @@
 
 ESP32-S3 USB-host-to-WiFi bridge for Betaflight. The board acts as USB **host**
 to a flight controller's Virtual COM Port (VCP) and exposes that serial stream
-over TCP, so Betaflight Configurator can connect wirelessly from a phone or
+over TCP, so the Betaflight app can connect wirelessly from a phone or
 laptop.
 
 ```
-[FC USB VCP] <--USB host--> [ESP32-S3 mini] <--WiFi / TCP:5761--> [Configurator]
+[FC USB VCP] <--USB host--> [ESP32-S3 mini] <--WiFi / TCP:5761--> [Betaflight app]
 ```
 
 It is a transparent byte bridge — no MSP parsing happens on the ESP32.
@@ -101,7 +101,7 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **Display:** 4.0" 480×480 IPS (ST7701, 16-bit parallel RGB565) with GT911
   capacitive touch, driven by the Waveshare BSP + LVGL
   (`CONFIG_BRIDGE_DISPLAY_TOUCH`). The screen shows the same status as the web
-  page — FC link, Configurator client, WiFi, IP — and offers on-screen WiFi
+  page — FC link, app client, WiFi, IP — and offers on-screen WiFi
   scan/join/forget with a touch keyboard.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
@@ -120,7 +120,7 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **MCU / memory:** ESP32-S3, 4 MB flash, no PSRAM.
 - **Display:** 1.47" 172x320 IPS ST7789 display driven over SPI with LVGL
   (`CONFIG_BRIDGE_DISPLAY_COMPACT`). The compact status screen shows the FC and
-  Configurator links, WiFi state, connection addresses, a QR code for the web
+  app links, WiFi state, connection addresses, a QR code for the web
   UI, and the input voltage measured on GPIO12.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
@@ -174,7 +174,7 @@ and checked on OTA, so an image built for one board is refused on another (see
 | | slow blink (~1 Hz) | SoftAP setup mode / idle |
 | NeoPixel (WS2812) | dim red | no FC attached |
 | | amber | FC VCP open, idle |
-| | green | FC + Configurator (TCP) linked |
+| | green | FC + app (TCP) linked |
 | | blue flash | bytes flowing to/from the FC |
 
 ### Adding a board
@@ -362,11 +362,13 @@ up its own SoftAP so you can set it up:
    immediately — the status panel shows the assigned IP and netmask. The SoftAP
    stays up for 30 s after the join so you can note the new address, then
    stops.
-4. In Configurator choose the **TCP** connection, host `192.168.4.1`, port
-   `5761` (or the station IP once joined).
+4. In the app's **Options**, turn on expert mode and **Enable manual
+   connection mode**.
+5. Pick **Manual Selection** and enter `tcp://192.168.4.1:5761` (or the
+   station IP once joined).
 
 After a network is stored, **subsequent boots join it directly as a station and
-the SoftAP is not started** — reach the web UI and Configurator at the IP your
+the SoftAP is not started** — reach the web UI and the app at the IP your
 router assigns (shown on the page). If that network is ever unreachable at boot,
 the SoftAP comes back up automatically so you can reconfigure, and stops again
 30 s after the network is rejoined. Use *Forget* on
@@ -417,7 +419,7 @@ exposes the serial stream as a WebSocket at `/serial`:
 - `wss://<ip>/serial` (port 443) — required by the hosted app at
   `app.betaflight.com` (an HTTPS page may only open a *secure* WebSocket).
 
-In Configurator, enable expert mode, pick the manual connection option, and
+In the app, enable expert mode, pick the manual connection option, and
 enter the URL (the status page shows the exact `wss://<ip>/serial` to use).
 
 **Certificate acceptance (one-time).** The TLS server uses a **self-signed**
@@ -475,7 +477,7 @@ RESET also leaves USB flash mode.
 ## Flashing the flight controller
 
 The **Flash flight controller** card on the web page flashes the FC itself over
-USB DFU — no cable, no Configurator. Pick a Betaflight `.hex`, choose the
+USB DFU — no cable, no app. Pick a Betaflight `.hex`, choose the
 options, and the bridge does the rest:
 
 | Phase | What happens |
@@ -498,7 +500,7 @@ config* ticked; the page downloads the capture to your browser as soon as it
 exists, because the bridge only holds it in RAM. *Restore backup* replays it
 once the new firmware has booted.
 
-Flashing takes the FC exclusively: a connected Configurator is dropped and new
+Flashing takes the FC exclusively: a connected app is dropped and new
 connections are refused, with a reason, until it finishes.
 
 Only Intel HEX is supported today. `.bin` and `.uf2`, and flashing boards whose

@@ -110,7 +110,7 @@ static void ws_send(const uint8_t *data, size_t len)
     }
 }
 
-// Single FC -> Configurator pump. It is the only consumer of the FC->net buffer,
+// Single FC -> app pump. It is the only consumer of the FC->net buffer,
 // so there is never a second reader to race with; it routes each frame to the
 // client that currently owns the bridge (or discards it when nobody does). A WS
 // client that has just been superseded is closed here so the newest connection
@@ -214,7 +214,7 @@ static esp_err_t ws_open(httpd_req_t *req)
 
 static esp_err_t ws_handler(httpd_req_t *req)
 {
-    // A frame from the Configurator. Frames may arrive from a superseded session
+    // A frame from the app. Frames may arrive from a superseded session
     // (one we replaced via newest-wins but that hasn't finished closing) — those
     // must not touch the promoted client's bridge, so gate on the active session.
     bool active = (req->handle == s_hd && httpd_req_to_sockfd(req) == s_fd);
