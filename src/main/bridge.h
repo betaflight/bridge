@@ -19,7 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Byte bridge between the USB CDC (FC side) and the TCP client (Configurator
+// Byte bridge between the USB CDC (FC side) and the TCP client (app
 // side). Two FreeRTOS stream buffers decouple the producer/consumer contexts so
 // neither the USB driver callback nor the socket recv loop can stall the other.
 #pragma once
@@ -50,7 +50,7 @@ typedef enum {
 void bridge_claim(bridge_client_t who);
 
 // As bridge_claim(), but refuses when the flasher holds the stream: reflashing
-// the FC must not be interrupted by someone opening Configurator. Returns false
+// the FC must not be interrupted by someone opening the app. Returns false
 // without claiming in that case. The test and the claim are atomic, so a
 // connection cannot slip in between a flash starting and the check.
 bool bridge_claim_unless_flashing(bridge_client_t who);
@@ -65,22 +65,22 @@ void bridge_release(bridge_client_t who);
 // The current owner, or BRIDGE_CLIENT_NONE when free.
 bridge_client_t bridge_client_owner(void);
 
-// FC -> Configurator. Called from the USB CDC RX callback context. Non-blocking;
+// FC -> app. Called from the USB CDC RX callback context. Non-blocking;
 // returns the number of bytes actually queued (may be < len if the buffer is
 // full, which means the TCP side is not draining fast enough).
 size_t bridge_usb_to_net_push(const uint8_t *data, size_t len);
 
-// FC -> Configurator drain. Called by the TCP TX task. Blocks up to
+// FC -> app drain. Called by the TCP TX task. Blocks up to
 // timeout_ms for at least one byte. Returns bytes written into out.
 size_t bridge_usb_to_net_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);
 
-// Configurator -> FC. Called from the TCP RX task. `who` is the caller's own
+// App -> FC. Called from the TCP RX task. `who` is the caller's own
 // identity: the write is dropped if the bridge has since changed hands, so bytes
 // read before a takeover cannot land in the new owner's stream. Non-blocking
 // with respect to the buffer; returns bytes queued.
 size_t bridge_net_to_usb_push(bridge_client_t who, const uint8_t *data, size_t len);
 
-// Configurator -> FC drain. Called by the USB TX task. Blocks up to timeout_ms.
+// App -> FC drain. Called by the USB TX task. Blocks up to timeout_ms.
 size_t bridge_net_to_usb_pop(uint8_t *out, size_t max_len, uint32_t timeout_ms);
 
 // Discard any buffered data in both directions. Called when a client connects or

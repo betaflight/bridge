@@ -57,7 +57,7 @@ void tcp_server_kick(void)
     }
 }
 
-// Send FC->Configurator bytes to the connected TCP client. Called by the single
+// Send FC->app bytes to the connected TCP client. Called by the single
 // net TX pump (ws_serial.c) only while the TCP client owns the bridge.
 void tcp_server_send(const uint8_t *data, size_t len)
 {
@@ -201,7 +201,7 @@ static void tcp_accept_task(void *arg)
             // Claim first: dropping the current client before knowing whether
             // this one can be served would lose both.
             if (!bridge_claim_unless_flashing(BRIDGE_CLIENT_TCP)) {
-                // Say why rather than dropping silently: a Configurator user
+                // Say why rather than dropping silently: an app user
                 // who cannot connect mid-flash deserves an explanation.
                 ESP_LOGW(TAG, "refusing client: flashing the FC");
                 const char *msg = "betaflight-bridge: flashing the FC, try again shortly\r\n";

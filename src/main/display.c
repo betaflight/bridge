@@ -469,7 +469,7 @@ static void build_status_tab(lv_obj_t *tab)
     lv_obj_set_style_pad_row(tab, 2, 0);
 
     s_val_fc   = add_row(tab, "FC (USB VCP)");
-    s_val_cfg  = add_row(tab, "Configurator");
+    s_val_cfg  = add_row(tab, "App");
     s_val_sta  = add_row(tab, "WiFi network");
     s_val_rssi = add_row(tab, "Signal");
     s_val_ip   = add_row(tab, "IP address");

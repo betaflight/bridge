@@ -22,10 +22,10 @@
 // betaflight-bridge: ESP32-S3 USB-host-to-WiFi bridge.
 //
 // Acts as USB host to a Betaflight flight controller's Virtual COM Port (VCP)
-// and exposes that serial stream over TCP, so Betaflight Configurator (TCP
+// and exposes that serial stream over TCP, so the Betaflight app (TCP
 // transport, default port 5761) can connect wirelessly from a phone or laptop.
 //
-//   [FC USB VCP] <--USB host--> [ESP32-S3] <--WiFi/TCP:5761--> [Configurator]
+//   [FC USB VCP] <--USB host--> [ESP32-S3] <--WiFi/TCP:5761--> [Betaflight app]
 //
 // Data flow is a transparent byte bridge; no MSP parsing happens here.
 

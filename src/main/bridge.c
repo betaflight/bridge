@@ -33,8 +33,8 @@
 // sensitive and we do our own batching on the read side.
 #define BRIDGE_TRIGGER    1
 
-static StreamBufferHandle_t s_usb_to_net;  // FC  -> Configurator
-static StreamBufferHandle_t s_net_to_usb;  // Configurator -> FC
+static StreamBufferHandle_t s_usb_to_net;  // FC  -> app
+static StreamBufferHandle_t s_net_to_usb;  // app -> FC
 // One receiver at a time per buffer: a client-takeover reset must never run
 // concurrently with a pump task blocked in xStreamBufferReceive (that asserts).
 static SemaphoreHandle_t s_u2n_mux;   // guards receives from s_usb_to_net

@@ -33,7 +33,7 @@
 #include "usb/cdc_acm_host.h"
 
 // Candidate VCP USB IDs, generated from the Betaflight build API (the same list
-// Configurator uses). Refresh with: python3 tools/gen_vcp_ids.py
+// the app uses). Refresh with: python3 tools/gen_vcp_ids.py
 #include "vcp_ids.generated.h"
 
 static const char *TAG = "usb_cdc";
