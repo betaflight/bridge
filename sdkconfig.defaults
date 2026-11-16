@@ -61,6 +61,10 @@ CONFIG_BT_NIMBLE_NVS_PERSIST=n
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=247
 # One advertising set and one connection.
 CONFIG_BT_CTRL_BLE_MAX_ACT=2
+# Buffer pools sized for that one connection rather than the IDF defaults.
+CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT=8
+CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT=12
+CONFIG_BT_NIMBLE_TRANSPORT_EVT_COUNT=12
 
 # --- lwIP ---
 # Disable Nagle so small MSP frames are flushed immediately (low latency).
