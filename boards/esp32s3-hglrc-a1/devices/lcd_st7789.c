@@ -34,7 +34,7 @@ esp_err_t bsp_display_backlight_on(void)
 {
     esp_err_t err = gpio_set_direction(BSP_LCD_BACKLIGHT, GPIO_MODE_OUTPUT);
     if (err == ESP_OK) {
-        err = gpio_set_level(BSP_LCD_BACKLIGHT, 1);
+        err = gpio_set_level(BSP_LCD_BACKLIGHT, BSP_LCD_BACKLIGHT_ON);
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "GPIO%d backlight enable failed: %s", BSP_LCD_BACKLIGHT,
@@ -58,7 +58,7 @@ lv_display_t *bsp_display_start(void)
         ESP_LOGE(TAG, "LCD backlight GPIO setup failed: %s", esp_err_to_name(err));
         return NULL;
     }
-    gpio_set_level(BSP_LCD_BACKLIGHT, 0);
+    gpio_set_level(BSP_LCD_BACKLIGHT, !BSP_LCD_BACKLIGHT_ON);
 
     const spi_bus_config_t bus_config = {
         .mosi_io_num = BSP_LCD_SPI_MOSI,

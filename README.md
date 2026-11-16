@@ -58,7 +58,7 @@ fonts, logos, managed components — stays there. The USB-host pins
 | `esp32s3-zero` (default) | 4 MB | — | single (native) | NeoPixel (GPIO21) |
 | `esp32s3-wroom-freenove` | 8 MB | 8 MB octal | dual (native + UART) | WiFi LED (GPIO2) + NeoPixel (GPIO48) |
 | `esp32s3-touch-lcd-4b` | 16 MB | 8 MB octal | single (native) | 4" LCD touch UI |
-| `esp32s3-hglrc-a1` | 4 MB | — | dual | NeoPixel (GPIO48) + 1.47" LCD |
+| `esp32s3-hglrc-a1` | 4 MB | — | dual | NeoPixel (GPIO2) + 1.47" LCD |
 | `esp32s3-touch-amoled-1-75c` | 32 MB | 8 MB octal | single (native) | 1.75" round AMOLED touch UI |
 | `esp32s3-touch-amoled-1-8` | 16 MB | 8 MB octal | single (native) | 1.8" AMOLED touch UI |
 
@@ -121,12 +121,13 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **Display:** 1.47" 172x320 IPS ST7789 display driven over SPI with LVGL
   (`CONFIG_BRIDGE_DISPLAY_COMPACT`). The compact status screen shows the FC and
   app links, WiFi state, connection addresses, a QR code for the web
-  UI, and the input voltage measured on GPIO12.
+  UI, and the battery voltage (the higher of the XT60 input on GPIO4 and the
+  XT30 input on GPIO6).
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
   console drops out once host mode engages**. UART0 is available on the header
   when a persistent log console is required.
-- **LED:** the on-board WS2812 NeoPixel (GPIO48) indicates FC/OTG comms.
+- **LED:** the on-board WS2812 NeoPixel (GPIO2) indicates FC/OTG comms.
 - **Partitions:** 4 MB dual-OTA, ~1.8 MB per slot
   (`boards/esp32s3-hglrc-a1/partitions.csv`).
 
