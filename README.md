@@ -269,8 +269,9 @@ use `2026.9.1` in place of the version.
 
 Calendar versioning, `YEAR.MONTH.PATCH` with an optional pre-release suffix,
 the shape betaflight uses — but on the bridge's own release clock, so the
-numbers will not line up with a betaflight release of the same name. `PATCH` is
-`0` for the first release of a `YEAR.MONTH` and goes up for bug-fix releases.
+numbers will not line up with a betaflight release of the same name. master
+carries the month of the next release with `PATCH` `0` (for example
+`2026.12.0`); releases for that month are `.1`, `.2` and so on.
 
 `src/main/version.h` is the only place it is written down. There is no way to
 override it at build time: an image is whatever the committed header says, so a
@@ -278,9 +279,9 @@ filename can never contradict the firmware inside it.
 
 To cut a release:
 
-1. Bump the components in `src/main/version.h` and merge that. Clear
-   `BRIDGE_VERSION_SUFFIX` to `""` for a final, or set it to `"-rc1"` and
-   friends for a pre-release.
+1. Set `BRIDGE_VERSION_PATCH` in `src/main/version.h` to the release number
+   for the month and merge that. Leave `BRIDGE_VERSION_SUFFIX` as `""` for a
+   final, or set it to `"-rc1"` and friends for a pre-release.
 2. Tag the merge commit with exactly `make version`, no `v` prefix, and push
    the tag:
 
