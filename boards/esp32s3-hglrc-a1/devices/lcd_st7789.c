@@ -16,7 +16,7 @@
 
 #define TAG "board_lcd"
 #define LCD_SPI_CLOCK_HZ (60 * 1000 * 1000)
-#define LCD_BUFFER_LINES 40
+#define LCD_BUFFER_LINES 20
 
 static lv_display_t *s_display;
 

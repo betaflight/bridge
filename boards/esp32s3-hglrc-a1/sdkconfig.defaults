@@ -24,6 +24,9 @@ CONFIG_BRIDGE_ADC_VOLTAGE=y
 # English/Chinese web page with a light/dark theme toggle.
 CONFIG_BRIDGE_WEB_I18N=y
 CONFIG_LV_COLOR_DEPTH_16=y
+# No PSRAM: LVGL takes what it needs from the heap rather than a 64 KB static
+# pool, leaving internal RAM for WiFi buffers and the BLE controller.
+CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
 CONFIG_LV_FONT_MONTSERRAT_12=y
 CONFIG_LV_FONT_MONTSERRAT_10=y
