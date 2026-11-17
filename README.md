@@ -279,10 +279,11 @@ filename can never contradict the firmware inside it.
 
 To cut a release:
 
-1. Branch `YEAR.MONTH-maintenance` (for example `2026.12-maintenance`) off
-   master. Releases for that month are cut from it, so master keeps `PATCH`
-   `0`. Then move master on to the next release month by setting
-   `BRIDGE_VERSION_YEAR` and `BRIDGE_VERSION_MONTH` there.
+1. For the first release of a month, branch `YEAR.MONTH-maintenance` (for
+   example `2026.12-maintenance`) off master, then move master on to the next
+   release month by setting `BRIDGE_VERSION_YEAR` and `BRIDGE_VERSION_MONTH`
+   there. Later releases for that month reuse the existing branch, so master
+   always keeps `PATCH` `0`.
 2. On the maintenance branch, set `BRIDGE_VERSION_PATCH` in
    `src/main/version.h` to the release number and merge that. Leave
    `BRIDGE_VERSION_SUFFIX` as `""` for a final. A release candidate keeps
@@ -299,10 +300,10 @@ To cut a release:
    a release. Otherwise it builds every board and leaves a **draft** release
    carrying both images for each, with generated notes. A suffixed version is
    marked as a pre-release automatically; you don't have to tick the box.
-5. Review the draft, then publish it.
+5. Check the workflow succeeded and the draft carries both images for every
+   board, review the notes, then publish it.
 
-Nothing is public until step 5, and the images are attached in one go after
-every board has built, so a release is never left holding a partial set.
+The tag is public once pushed, but the release stays a draft until step 5.
 
 Release notes are GitHub's own generator, bucketed by the labels in
 `.github/release.yml`. An unlabelled PR still appears, under "Changes".
