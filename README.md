@@ -279,24 +279,29 @@ filename can never contradict the firmware inside it.
 
 To cut a release:
 
-1. Set `BRIDGE_VERSION_PATCH` in `src/main/version.h` to the release number
-   for the month and merge that. Leave `BRIDGE_VERSION_SUFFIX` as `""` for a
-   final, or set it to `"-rc1"` and friends for a pre-release.
-2. Tag the merge commit with exactly `make version`, no `v` prefix, and push
+1. Branch `YEAR.MONTH-maintenance` (for example `2026.12-maintenance`) off
+   master. Releases for that month are cut from it, so master keeps `PATCH`
+   `0`. Then move master on to the next release month by setting
+   `BRIDGE_VERSION_YEAR` and `BRIDGE_VERSION_MONTH` there.
+2. On the maintenance branch, set `BRIDGE_VERSION_PATCH` in
+   `src/main/version.h` to the release number and merge that. Leave
+   `BRIDGE_VERSION_SUFFIX` as `""` for a final. A release candidate keeps
+   `PATCH` `0` and sets the suffix, e.g. `2026.12.0-rc1`.
+3. Tag the merge commit with exactly `make version`, no `v` prefix, and push
    the tag:
 
    ```sh
    git tag "$(make version)" && git push origin "$(make version)"
    ```
 
-3. `.github/workflows/release.yml` picks the tag up. It fails immediately if
+4. `.github/workflows/release.yml` picks the tag up. It fails immediately if
    the tag disagrees with `src/main/version.h`, so a mistyped tag never becomes
    a release. Otherwise it builds every board and leaves a **draft** release
    carrying both images for each, with generated notes. A suffixed version is
    marked as a pre-release automatically; you don't have to tick the box.
-4. Review the draft, then publish it.
+5. Review the draft, then publish it.
 
-Nothing is public until step 4, and the images are attached in one go after
+Nothing is public until step 5, and the images are attached in one go after
 every board has built, so a release is never left holding a partial set.
 
 Release notes are GitHub's own generator, bucketed by the labels in
