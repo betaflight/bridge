@@ -51,6 +51,10 @@ ble_serial_state_t ble_serial_state(void);
 // BLE is off).
 const char *ble_serial_name(void);
 
+// The suffix that tells bridges apart in a scan, e.g. "a1b2c3" (empty when BLE
+// is off).
+const char *ble_serial_id(void);
+
 // Drop the BLE client if another transport has taken the bridge from it.
 // Called periodically by the net TX pump.
 void ble_serial_poll(void);

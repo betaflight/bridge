@@ -66,6 +66,7 @@ static uint16_t s_rx_handle;
 static uint16_t s_tx_handle;
 
 static char s_name[32];
+static char s_id[7];
 static uint8_t s_own_addr_type;
 
 static volatile uint16_t s_conn = BLE_HS_CONN_HANDLE_NONE;
@@ -294,7 +295,8 @@ void ble_serial_start(void)
 {
     uint8_t mac[6] = {0};
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    snprintf(s_name, sizeof(s_name), "Betaflight Bridge %02x%02x%02x", mac[3], mac[4], mac[5]);
+    snprintf(s_id, sizeof(s_id), "%02x%02x%02x", mac[3], mac[4], mac[5]);
+    snprintf(s_name, sizeof(s_name), "Betaflight Bridge %s", s_id);
 
     esp_err_t err = nimble_port_init();
     if (err != ESP_OK) {
@@ -376,6 +378,11 @@ const char *ble_serial_name(void)
     return s_name;
 }
 
+const char *ble_serial_id(void)
+{
+    return s_id;
+}
+
 void ble_serial_poll(void)
 {
     if (s_conn != BLE_HS_CONN_HANDLE_NONE && s_claimed && !s_terminating &&
@@ -401,6 +408,11 @@ ble_serial_state_t ble_serial_state(void)
 }
 
 const char *ble_serial_name(void)
+{
+    return "";
+}
+
+const char *ble_serial_id(void)
 {
     return "";
 }

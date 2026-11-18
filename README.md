@@ -121,8 +121,8 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **MCU / memory:** ESP32-S3, 4 MB flash, no PSRAM.
 - **Display:** 1.47" 172x320 IPS ST7789 display driven over SPI with LVGL
   (`CONFIG_BRIDGE_DISPLAY_COMPACT`). The compact status screen shows the FC and
-  app links, WiFi state, connection addresses, a QR code for the web
-  UI, and the battery voltage (the higher of the XT60 input on GPIO4 and the
+  app links, WiFi state, BLE name suffix, connection addresses, a QR code for
+  the web UI, and the battery voltage (the higher of the XT60 input on GPIO4 and the
   XT30 input on GPIO6).
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
