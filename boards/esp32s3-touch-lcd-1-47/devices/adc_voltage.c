@@ -24,7 +24,7 @@ static adc_unit_t s_adc_unit;
 static adc_input_t s_inputs[ADC_INPUT_COUNT];
 static volatile uint32_t s_voltage_mv;
 
-static uint32_t read_input_mv(const adc_input_t *input)
+static bool read_input_mv(const adc_input_t *input, uint32_t *mv)
 {
     int raw_sum = 0;
     int sample_count = 0;
@@ -40,9 +40,10 @@ static uint32_t read_input_mv(const adc_input_t *input)
     int adc_mv = 0;
     if (sample_count == 0 ||
         adc_cali_raw_to_voltage(input->cali, raw_sum / sample_count, &adc_mv) != ESP_OK) {
-        return 0;
+        return false;
     }
-    return (uint32_t)adc_mv * BOARD_ADC_DIVIDER_RATIO;
+    *mv = adc_mv > 0 ? (uint32_t)adc_mv * BOARD_ADC_DIVIDER_RATIO : 0;
+    return true;
 }
 
 static void adc_voltage_task(void *arg)
@@ -51,13 +52,21 @@ static void adc_voltage_task(void *arg)
 
     while (1) {
         uint32_t highest_mv = 0;
+        bool any_read = false;
         for (size_t i = 0; i < ADC_INPUT_COUNT; i++) {
-            uint32_t mv = read_input_mv(&s_inputs[i]);
-            if (mv > highest_mv) {
-                highest_mv = mv;
+            uint32_t mv;
+            if (read_input_mv(&s_inputs[i], &mv)) {
+                any_read = true;
+                if (mv > highest_mv) {
+                    highest_mv = mv;
+                }
             }
         }
-        s_voltage_mv = highest_mv;
+        // GPIO12 is on ADC2, which WiFi can hold; a pass with no conversions
+        // keeps the last reading.
+        if (any_read) {
+            s_voltage_mv = highest_mv;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(ADC_SAMPLE_PERIOD_MS));
     }

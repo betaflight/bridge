@@ -3,7 +3,7 @@
 dependencies:
   # Public: board_display.h exposes LVGL types to the shared display code.
   lvgl/lvgl:
-    version: "^9.2.0"
+    version: "^9.4.0"
     public: true
   # LVGL <-> esp_lcd glue for the directly driven JD9853 panel.
   espressif/esp_lvgl_port: "^2.8.0~1"

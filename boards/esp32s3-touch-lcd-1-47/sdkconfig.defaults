@@ -15,8 +15,9 @@ CONFIG_SPIRAM_RODATA=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 
-# The native USB-Serial-JTAG console drops once USB host mode engages.
-# Use UART0 on the header when a persistent log console is required.
+# The native USB-Serial-JTAG console drops once USB host mode engages. For a
+# persistent log on the header UART0 (TX GPIO43 / RX GPIO44), build with
+# CONFIG_ESP_CONSOLE_UART_DEFAULT instead.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # Board identity baked into the image and checked on OTA.

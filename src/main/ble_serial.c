@@ -267,6 +267,7 @@ static void advertise(void)
     if (rc == 0 || rc == BLE_HS_EALREADY) {
         s_advertising = true;
     } else {
+        s_advertising = false;
         ESP_LOGE(TAG, "advertising failed: %d", rc);
     }
 }

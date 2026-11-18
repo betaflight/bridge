@@ -142,8 +142,13 @@ and checked on OTA, so an image built for one board is refused on another (see
   AXS5106L touch controller is not used.
 - **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
   shared between flashing/console and the USB-host bridge — **the serial
-  console drops out once host mode engages**. UART0 is available on the header
-  when a persistent log console is required.
+  console drops out once host mode engages**. For a persistent log on the
+  header UART0 (TX GPIO43 / RX GPIO44), build with
+  `CONFIG_ESP_CONSOLE_UART_DEFAULT`.
+- **Power:** the USB-C never sources VBUS. VBUS only feeds the board, through a
+  diode, and on battery the 1S LiPo powers the board alone. When it hosts the
+  FC, either the FC is powered on its own (flight battery), or 5 V is fed into
+  the header VBUS pin (P1 pin 1), which is the same net as the USB-C VBUS.
 - **LEDs:** none used — status is on the LCD.
 - **Partitions:** 16 MB dual-OTA, 6 MB per slot
   (`boards/esp32s3-touch-lcd-1-47/partitions.csv`).
