@@ -61,6 +61,7 @@ fonts, logos, managed components — stays there. The USB-host pins
 | `esp32s3-hglrc-a1` | 4 MB | — | dual | NeoPixel (GPIO2) + 1.47" LCD |
 | `esp32s3-touch-amoled-1-75c` | 32 MB | 8 MB octal | single (native) | 1.75" round AMOLED touch UI |
 | `esp32s3-touch-amoled-1-8` | 16 MB | 8 MB octal | single (native) | 1.8" AMOLED touch UI |
+| `esp32s3-touch-lcd-1-47` | 16 MB | 8 MB octal | single (native) | 1.47" LCD |
 
 A board identity (`BOARD_NAME`) is baked into each image (`esp_app_desc.version`)
 and checked on OTA, so an image built for one board is refused on another (see
@@ -130,6 +131,22 @@ and checked on OTA, so an image built for one board is refused on another (see
 - **LED:** the on-board WS2812 NeoPixel (GPIO2) indicates FC/OTG comms.
 - **Partitions:** 4 MB dual-OTA, ~1.8 MB per slot
   (`boards/esp32s3-hglrc-a1/partitions.csv`).
+
+### `esp32s3-touch-lcd-1-47` — [Waveshare ESP32-S3-Touch-LCD-1.47](https://www.waveshare.com/esp32-s3-touch-lcd-1.47.htm)
+
+- **MCU / memory:** ESP32-S3R8, 16 MB flash, 8 MB octal PSRAM. The `-M`
+  variant (pre-soldered header) uses the same image.
+- **Display:** 1.47" 172x320 IPS JD9853 display driven over SPI with LVGL
+  (`CONFIG_BRIDGE_DISPLAY_COMPACT`), showing the same compact status screen as
+  the HGLRC A1. The 1S LiPo voltage (GPIO12) is shown in the header. The
+  AXS5106L touch controller is not used.
+- **USB:** one USB-C, wired to the native ESP32-S3 USB (D- GPIO19 / D+ GPIO20),
+  shared between flashing/console and the USB-host bridge — **the serial
+  console drops out once host mode engages**. UART0 is available on the header
+  when a persistent log console is required.
+- **LEDs:** none used — status is on the LCD.
+- **Partitions:** 16 MB dual-OTA, 6 MB per slot
+  (`boards/esp32s3-touch-lcd-1-47/partitions.csv`).
 
 ### `esp32s3-touch-amoled-1-75c` — [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/esp32-s3-touch-amoled-1.75c.htm)
 
