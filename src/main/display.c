@@ -770,6 +770,7 @@ static const char *TAG = "display";
 static lv_obj_t *s_compact_fc;
 static lv_obj_t *s_compact_client;
 static lv_obj_t *s_compact_wifi;
+static lv_obj_t *s_compact_ble;
 static lv_obj_t *s_compact_address[3];
 static lv_obj_t *s_compact_address_key;
 static lv_obj_t *s_compact_status;
@@ -855,6 +856,18 @@ static void compact_refresh_cb(lv_timer_t *timer)
         set_value(s_compact_client, "BLE", COL_UP);
     } else {
         set_value(s_compact_client, "NONE", COL_DOWN);
+    }
+
+    switch (ble_serial_state()) {
+    case BLE_SERIAL_CONNECTED:
+        set_value(s_compact_ble, ble_serial_id(), COL_UP);
+        break;
+    case BLE_SERIAL_ADVERTISING:
+        set_value(s_compact_ble, ble_serial_id(), COL_MONO);
+        break;
+    default:
+        set_value(s_compact_ble, "OFF", COL_DOWN);
+        break;
     }
 
 #if CONFIG_BRIDGE_ADC_VOLTAGE
@@ -991,17 +1004,18 @@ static void build_compact_ui(void)
     compact_card(screen, 8, 42, 180, 122);
     compact_card(screen, 198, 42, 114, 122);
 
-    s_compact_fc = compact_value(screen, "FC", 48);
-    s_compact_client = compact_value(screen, "CLIENT", 67);
-    s_compact_wifi = compact_value(screen, "WIFI", 86);
-    s_compact_address[0] = compact_value(screen, "IP", 105);
-    lv_obj_set_pos(s_compact_address_key, 10, 105);
+    s_compact_fc = compact_value(screen, "FC", 46);
+    s_compact_client = compact_value(screen, "CLIENT", 63);
+    s_compact_ble = compact_value(screen, "BLE", 80);
+    s_compact_wifi = compact_value(screen, "WIFI", 97);
+    s_compact_address[0] = compact_value(screen, "IP", 114);
+    lv_obj_set_pos(s_compact_address_key, 10, 114);
     lv_obj_set_size(s_compact_address_key, 62, 48);
-    lv_obj_set_pos(s_compact_address[0], 76, 105);
+    lv_obj_set_pos(s_compact_address[0], 76, 114);
     lv_obj_set_size(s_compact_address[0], 108, 16);
     lv_label_set_long_mode(s_compact_address[0], LV_LABEL_LONG_SCROLL_CIRCULAR);
-    s_compact_address[1] = compact_address_value(screen, 121);
-    s_compact_address[2] = compact_address_value(screen, 137);
+    s_compact_address[1] = compact_address_value(screen, 130);
+    s_compact_address[2] = compact_address_value(screen, 146);
     lv_label_set_long_mode(s_compact_wifi, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     s_compact_qr = lv_qrcode_create(screen);

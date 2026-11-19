@@ -1,0 +1,44 @@
+# Waveshare ESP32-S3-Touch-LCD-1.47 (ESP32-S3R8, 16 MB flash) with a 172x320
+# JD9853 LCD.
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="boards/esp32s3-touch-lcd-1-47/partitions.csv"
+
+# 8 MB octal PSRAM.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# The native USB-Serial-JTAG console drops once USB host mode engages. For a
+# persistent log on the header UART0 (TX GPIO43 / RX GPIO44), build with
+# CONFIG_ESP_CONSOLE_UART_DEFAULT instead.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Board identity baked into the image and checked on OTA.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=y
+CONFIG_APP_PROJECT_VER="esp32s3-touch-lcd-1-47"
+
+# Native LVGL text display on the directly connected JD9853 panel.
+CONFIG_BRIDGE_DISPLAY_COMPACT=y
+# 1S LiPo voltage on BOARD_ADC_GPIOS, shown in the display header.
+CONFIG_BRIDGE_ADC_VOLTAGE=y
+# English/Chinese web page with a light/dark theme toggle.
+CONFIG_BRIDGE_WEB_I18N=y
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_12=y
+CONFIG_LV_FONT_MONTSERRAT_10=y
+CONFIG_LV_USE_QRCODE=y
+
+# Internal RAM is short once the BLE controller, USB host and panel DMA buffers
+# are up: NimBLE host, WiFi/lwIP buffers and TLS sessions go to PSRAM.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
