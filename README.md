@@ -270,8 +270,9 @@ use `2026.9.1` in place of the version.
 
 Calendar versioning, `YEAR.MONTH.PATCH` with an optional pre-release suffix,
 the shape betaflight uses — but on the bridge's own release clock, so the
-numbers will not line up with a betaflight release of the same name. `PATCH` is
-`0` for the first release of a `YEAR.MONTH` and goes up for bug-fix releases.
+numbers will not line up with a betaflight release of the same name. master
+carries the month of the next release with `PATCH` `0` (for example
+`2026.12.0`); releases for that month are `.1`, `.2` and so on.
 
 `src/main/version.h` is the only place it is written down. There is no way to
 override it at build time: an image is whatever the committed header says, so a
@@ -279,25 +280,31 @@ filename can never contradict the firmware inside it.
 
 To cut a release:
 
-1. Bump the components in `src/main/version.h` and merge that. Clear
-   `BRIDGE_VERSION_SUFFIX` to `""` for a final, or set it to `"-rc1"` and
-   friends for a pre-release.
-2. Tag the merge commit with exactly `make version`, no `v` prefix, and push
+1. For the first release of a month, branch `YEAR.MONTH-maintenance` (for
+   example `2026.12-maintenance`) off master, then move master on to the next
+   release month by setting `BRIDGE_VERSION_YEAR` and `BRIDGE_VERSION_MONTH`
+   there. Later releases for that month reuse the existing branch, so master
+   always keeps `PATCH` `0`.
+2. On the maintenance branch, set `BRIDGE_VERSION_PATCH` in
+   `src/main/version.h` to the release number and merge that. Leave
+   `BRIDGE_VERSION_SUFFIX` as `""` for a final. A release candidate keeps
+   `PATCH` `0` and sets the suffix, e.g. `2026.12.0-rc1`.
+3. Tag the merge commit with exactly `make version`, no `v` prefix, and push
    the tag:
 
    ```sh
    git tag "$(make version)" && git push origin "$(make version)"
    ```
 
-3. `.github/workflows/release.yml` picks the tag up. It fails immediately if
+4. `.github/workflows/release.yml` picks the tag up. It fails immediately if
    the tag disagrees with `src/main/version.h`, so a mistyped tag never becomes
    a release. Otherwise it builds every board and leaves a **draft** release
    carrying both images for each, with generated notes. A suffixed version is
    marked as a pre-release automatically; you don't have to tick the box.
-4. Review the draft, then publish it.
+5. Check the workflow succeeded and the draft carries both images for every
+   board, review the notes, then publish it.
 
-Nothing is public until step 4, and the images are attached in one go after
-every board has built, so a release is never left holding a partial set.
+The tag is public once pushed, but the release stays a draft until step 5.
 
 Release notes are GitHub's own generator, bucketed by the labels in
 `.github/release.yml`. An unlabelled PR still appears, under "Changes".
