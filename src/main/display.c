@@ -748,6 +748,7 @@ void display_start(void)
 #include "bridge.h"
 #include "ws_serial.h"
 #include "ble_serial.h"
+#include "version.h"
 
 LV_FONT_DECLARE(ui_font_size14);
 LV_FONT_DECLARE(ui_font_size24);
@@ -766,6 +767,9 @@ static const char *TAG = "display";
 #define COL_MONO    0x7fc7ff
 
 #define REFRESH_MS 500
+#define TITLE_NAME_MS    15000
+#define TITLE_VERSION_MS 5000
+#define TITLE_NAME       "USB BRIDGE"
 
 static lv_obj_t *s_compact_fc;
 static lv_obj_t *s_compact_client;
@@ -819,6 +823,14 @@ static lv_obj_t *compact_address_value(lv_obj_t *parent, int y)
     lv_obj_set_style_text_font(label, &ui_font_size14, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(COL_TEXT), 0);
     return label;
+}
+
+static void compact_title_cb(lv_timer_t *timer)
+{
+    lv_obj_t *title = lv_timer_get_user_data(timer);
+    bool showing_name = strcmp(lv_label_get_text(title), TITLE_NAME) == 0;
+    lv_label_set_text(title, showing_name ? "v" BRIDGE_VERSION : TITLE_NAME);
+    lv_timer_set_period(timer, showing_name ? TITLE_VERSION_MS : TITLE_NAME_MS);
 }
 
 static void compact_card(lv_obj_t *parent, int x, int y, int w, int h)
@@ -972,12 +984,13 @@ static void build_compact_ui(void)
     lv_obj_set_pos(logo, 10, 8);
 
     lv_obj_t *title = lv_label_create(header);
-    lv_label_set_text(title, "USB BRIDGE");
+    lv_label_set_text(title, TITLE_NAME);
     lv_obj_set_size(title, 85, 20);
     lv_obj_set_pos(title, 91, 8);
     lv_label_set_long_mode(title, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(title, &ui_font_size14, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(COL_TEXT), 0);
+    lv_timer_create(compact_title_cb, TITLE_NAME_MS, title);
 
 #if CONFIG_BRIDGE_ADC_VOLTAGE
     s_compact_voltage = lv_label_create(header);
